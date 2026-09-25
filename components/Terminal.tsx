@@ -63,7 +63,9 @@ const Terminal: React.FC = () => {
                 else if (cmd.startsWith('login ')) {
                      const key = cmd.replace('login ', '').trim();
                      localStorage.setItem('geminiKey', key);
-                     process.env.API_KEY = key; // Mock for current session
+                     if (typeof process !== 'undefined' && process.env) {
+                         process.env.API_KEY = key; // Mock for current session
+                     }
                      response = "NEURAL KEY UPDATED. REBOOT RECOMMENDED.";
                 }
                 else {

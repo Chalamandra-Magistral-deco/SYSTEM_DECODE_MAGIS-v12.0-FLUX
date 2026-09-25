@@ -1,7 +1,8 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 
 const getAI = () => {
-    const apiKey = process.env.API_KEY || localStorage.getItem('geminiKey') || '';
+    const envKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : undefined;
+    const apiKey = envKey || localStorage.getItem('geminiKey') || '';
     if (!apiKey) throw new Error("API Key not found");
     return new GoogleGenAI({ apiKey });
 };
@@ -135,8 +136,9 @@ export const generateVideo = async (prompt: string, aspectRatio: '16:9' | '9:16'
     if (!videoUri) throw new Error("Video generation failed");
 
     // Fetch the actual video bytes
-    const apiKey = process.env.API_KEY || localStorage.getItem('geminiKey');
-    const videoRes = await fetch(`${videoUri}&key=${apiKey}`);
+    const envKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : undefined;
+    const apiKey = envKey || localStorage.getItem('geminiKey') || '';
+    const videoRes = await fetch(`${videoUri}&key=${encodeURIComponent(apiKey)}`);
     const blob = await videoRes.blob();
     return URL.createObjectURL(blob);
 };
