@@ -17,8 +17,9 @@ const Terminal: React.FC = () => {
     }, [history]);
 
     const handleCommand = async (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !processing) {
+        if (e.key === 'Enter' && e.nativeEvent.isComposing !== true && e.keyCode !== 229 && !processing) {
             const cmd = input.trim();
+            if (!cmd) return;
             setInput('');
             setHistory(prev => [...prev, { type: 'in', text: cmd }]);
             setProcessing(true);

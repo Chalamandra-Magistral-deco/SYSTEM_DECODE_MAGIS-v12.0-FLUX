@@ -20,7 +20,8 @@ const ParticleBackground = () => {
         if (!ctx) return;
         
         let animationFrameId: number;
-        let particles: any[] = [];
+        type ParticleLike = { x: number; y: number; update: () => void; draw: () => void };
+        let particles: ParticleLike[] = [];
         
         const resize = () => {
             canvas.width = window.innerWidth;
@@ -105,8 +106,6 @@ const App: React.FC = () => {
     // Shared State for Matrix
     const [stats, setStats] = useState<MatrixStats>({ s: 50, e: 50, c: 50, m: 50 });
 
-    const getMaxZ = () => Math.max(...windows.map(w => w.zIndex), 10);
-
     const toggleWindow = (id: string) => {
         const target = windows.find(w => w.id === id);
         if (target) {
@@ -114,19 +113,22 @@ const App: React.FC = () => {
             else playWindowOpen();
         }
 
-        setWindows(prev => prev.map(w => {
-            if (w.id === id) {
-                if (w.isOpen && !w.isMinimized) return { ...w, isMinimized: true }; // If open, minimize
-                if (w.isOpen && w.isMinimized) return { ...w, isMinimized: false, zIndex: getMaxZ() + 1 }; // Restore
-                return { ...w, isOpen: true, zIndex: getMaxZ() + 1 }; // Open
-            }
-            return w;
-        }));
+        setWindows(prev => {
+            const nextZIndex = Math.max(...prev.map(w => w.zIndex), 10) + 1;
+            return prev.map(w => {
+                if (w.id !== id) return w;
+                if (w.isOpen && !w.isMinimized) return { ...w, isMinimized: true };
+                return { ...w, isOpen: true, isMinimized: false, zIndex: nextZIndex };
+            });
+        });
     };
 
     const bringToFront = (id: string) => {
         // No sound on just focus
-        setWindows(prev => prev.map(w => w.id === id ? { ...w, zIndex: getMaxZ() + 1 } : w));
+        setWindows(prev => {
+            const nextZIndex = Math.max(...prev.map(w => w.zIndex), 10) + 1;
+            return prev.map(w => w.id === id ? { ...w, zIndex: nextZIndex } : w);
+        });
     };
 
     const closeWindow = (id: string) => {

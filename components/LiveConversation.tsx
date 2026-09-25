@@ -11,6 +11,7 @@ const LiveConversation: React.FC = () => {
     
     // Refs for session management to avoid closure staleness
     const sessionRef = useRef<any>(null);
+    const mediaStreamRef = useRef<MediaStream | null>(null);
     const inputAudioContextRef = useRef<AudioContext | null>(null);
     const outputAudioContextRef = useRef<AudioContext | null>(null);
     
@@ -34,6 +35,7 @@ const LiveConversation: React.FC = () => {
 
             // Stream Setup
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaStreamRef.current = stream;
             
             const session = await ai.live.connect({
                 model: 'gemini-2.5-flash-native-audio-preview-09-2025',
@@ -132,10 +134,11 @@ const LiveConversation: React.FC = () => {
 
     const disconnect = () => {
         if (sessionRef.current) {
-            // sessionRef.current.close(); // Not always available on interface but usually implies cleaning up
-            // Re-instantiating or stopping tracks
+            sessionRef.current.close?.();
             sessionRef.current = null;
         }
+        mediaStreamRef.current?.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
         if (inputAudioContextRef.current) inputAudioContextRef.current.close();
         if (outputAudioContextRef.current) outputAudioContextRef.current.close();
         setIsConnected(false);

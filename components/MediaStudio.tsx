@@ -103,7 +103,7 @@ const MediaStudio: React.FC = () => {
                     const b64 = reader.result as string;
                     try {
                         const analysis = await analyzeVideo(b64, file.type, prompt || "Analyze this video");
-                        setOutput(analysis);
+                        setOutput(analysis ?? 'NO ANALYSIS RETURNED.');
                         setStatus('ANALYSIS COMPLETE.');
                     } catch (err: any) {
                          setStatus('ERROR: ' + err.message);
