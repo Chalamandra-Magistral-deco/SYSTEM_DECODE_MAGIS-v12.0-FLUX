@@ -77,9 +77,9 @@ const Window: React.FC<WindowProps> = ({
   return (
     <div
       ref={windowRef}
-      className={`absolute flex flex-col bg-glass-bg border-2 backdrop-blur-md rounded-lg shadow-2xl overflow-hidden ${theme.border} ${width}`}
+      className={`absolute flex flex-col w-[calc(100vw-1rem)] max-w-[550px] bg-glass-bg border-2 backdrop-blur-md rounded-lg shadow-2xl overflow-hidden ${theme.border}`}
       style={{
-        left: position.x,
+        left: `max(0.5rem, min(${position.x}px, calc(100vw - 0.5rem - min(550px, 100vw - 1rem))))`,
         top: position.y,
         zIndex: zIndex,
         maxHeight: '85vh',
