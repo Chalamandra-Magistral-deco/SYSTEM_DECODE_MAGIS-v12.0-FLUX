@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
 import Window from './components/Window';
 import DesktopIcon from './components/DesktopIcon';
-import MatrixAnalyzer from './components/MatrixAnalyzer';
-import Terminal from './components/Terminal';
-import DeploymentAnalyzer from './components/DeploymentAnalyzer';
-import MediaStudio from './components/MediaStudio';
-import LiveConversation from './components/LiveConversation';
+
+const MatrixAnalyzer = lazy(() => import('./components/MatrixAnalyzer'));
+const Terminal = lazy(() => import('./components/Terminal'));
+const DeploymentAnalyzer = lazy(() => import('./components/DeploymentAnalyzer'));
+const MediaStudio = lazy(() => import('./components/MediaStudio'));
+const LiveConversation = lazy(() => import('./components/LiveConversation'));
 import { WindowState, MatrixStats } from './types';
 import { Radar, Terminal as TerminalIcon, Cpu, Video, Mic, Sparkles, Info } from 'lucide-react';
 import { playWindowOpen, playWindowClose, playWindowMinimize } from './services/soundService';
@@ -200,11 +201,13 @@ const App: React.FC = () => {
                                 </div>
                             </div>
                         )}
-                        {win.type === 'MATRIX' && <MatrixAnalyzer stats={stats} setStats={setStats} />}
-                        {win.type === 'TERMINAL' && <Terminal />}
-                        {win.type === 'CICD' && <DeploymentAnalyzer stats={stats} />}
-                        {win.type === 'MEDIA' && <MediaStudio />}
-                        {win.type === 'LIVE' && <LiveConversation />}
+                        <Suspense fallback={<div className="p-4 font-mono text-xs text-neon-cyan animate-pulse">LOADING MODULE...</div>}>
+                            {win.type === 'MATRIX' && <MatrixAnalyzer stats={stats} setStats={setStats} />}
+                            {win.type === 'TERMINAL' && <Terminal />}
+                            {win.type === 'CICD' && <DeploymentAnalyzer stats={stats} />}
+                            {win.type === 'MEDIA' && <MediaStudio />}
+                            {win.type === 'LIVE' && <LiveConversation />}
+                        </Suspense>
                         {win.type === 'ABOUT' && (
                             <div className="flex flex-col gap-6 p-2 font-mono text-sm">
                                 <div className="border-2 border-neon-gold p-4 bg-neon-gold/5 shadow-glow-gold relative overflow-hidden">
