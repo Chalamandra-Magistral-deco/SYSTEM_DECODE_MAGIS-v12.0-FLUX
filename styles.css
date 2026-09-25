@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-bg-dark: #000000;
+  --color-neon-gold: #ffd700;
+  --color-neon-purple: #ff00ff;
+  --color-neon-cyan: #00ffff;
+  --color-neon-red: #ff0055;
+  --color-neon-green: #00ff00;
+  --color-glass-bg: rgb(0 0 0 / 0.9);
+  --font-family-rajdhani: Rajdhani, sans-serif;
+  --font-family-mono: "Share Tech Mono", monospace;
+  --shadow-glow-gold: 0 0 10px #ffd700;
+  --shadow-glow-purple: 0 0 10px #ff00ff;
+  --shadow-glow-cyan: 0 0 10px #00ffff;
+  --shadow-glow-green: 0 0 10px #00ff00;
+}
+
+:root {
+  font-family: Rajdhani, sans-serif;
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background-color: #000;
+  overflow: hidden;
+  user-select: none;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #111; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+.typing-cursor::after {
+  content: '_';
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+:focus-visible { outline: 2px solid #00ffff; outline-offset: 2px; }
