@@ -1,12 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { getLiveClient } from '../services/geminiService';
 import { Modality } from "@google/genai";
-import { Mic, MicOff, Radio, Volume2 } from 'lucide-react';
+import { Mic, MicOff, Volume2 } from 'lucide-react';
 
 const LiveConversation: React.FC = () => {
     const [isConnected, setIsConnected] = useState(false);
     const [volume, setVolume] = useState(0);
-    const videoRef = useRef<HTMLVideoElement>(null);
     const [logs, setLogs] = useState<string[]>([]);
     
     // Refs for session management to avoid closure staleness
@@ -38,7 +37,7 @@ const LiveConversation: React.FC = () => {
             mediaStreamRef.current = stream;
             
             const session = await ai.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+                model: 'gemini-3.8-live',
                 config: {
                    responseModalities: [Modality.AUDIO],
                    speechConfig: {
