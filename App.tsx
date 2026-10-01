@@ -19,11 +19,11 @@ const ParticleBackground = () => {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
-        
+
         let animationFrameId: number;
         type ParticleLike = { x: number; y: number; update: () => void; draw: () => void };
         let particles: ParticleLike[] = [];
-        
+
         const resize = () => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
@@ -145,7 +145,7 @@ const App: React.FC = () => {
     return (
         <div className="relative w-screen h-screen bg-bg-dark text-white overflow-hidden font-rajdhani">
             <ParticleBackground />
-            
+
             {/* Top HUD */}
             <div className="relative z-50 flex justify-between items-center px-6 py-2 bg-black/80 border-b-2 border-neon-purple backdrop-blur-md shadow-glow-purple">
                 <div className="flex items-center gap-2">
@@ -160,12 +160,11 @@ const App: React.FC = () => {
 
             {/* Desktop Area */}
             <div className="relative w-full h-full">
-                
+
                 {/* Windows */}
                 {windows.map(win => (
                     <Window
                         key={win.id}
-                        id={win.id}
                         title={win.title}
                         isOpen={win.isOpen}
                         isMinimized={win.isMinimized}
@@ -176,7 +175,7 @@ const App: React.FC = () => {
                         onFocus={() => bringToFront(win.id)}
                         color={win.type === 'MATRIX' ? 'gold' : win.type === 'CICD' ? 'green' : win.type === 'MEDIA' ? 'red' : win.type === 'LIVE' ? 'cyan' : win.type === 'ABOUT' ? 'gold' : 'purple'}
                         icon={
-                            win.type === 'MATRIX' ? <Radar size={18}/> : 
+                            win.type === 'MATRIX' ? <Radar size={18}/> :
                             win.type === 'CICD' ? <Cpu size={18}/> :
                             win.type === 'MEDIA' ? <Video size={18}/> :
                             win.type === 'LIVE' ? <Mic size={18}/> :
@@ -186,7 +185,7 @@ const App: React.FC = () => {
                     >
                         {win.type === 'CHALAMANDRA' && (
                             <div className="flex flex-col items-center gap-4 text-center">
-                                <img 
+                                <img
                                     src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEigiwRJJirRe5xXGe0X7D0vp1DmYEtQ5t16dh_cEIqaoe50DEfNzH32reGZYyKt2S3uqDSHivIM_OVlyyqKIDcvaWBND2jwGuo6xrsyKuSnagTkW0wOVJ5SaZBg092HlS0rZI_latqSGCS6QFBPjr0R3TMag58NArrFmPFKdewAdGwoTjo8ZwD04zS5a5_j/s512/1000024976.gif"
                                     alt="Chalamandra Core"
                                     className="w-32 h-32 rounded-full border-4 border-neon-red shadow-[0_0_30px_#ff0055] object-cover animate-pulse"
@@ -211,7 +210,7 @@ const App: React.FC = () => {
                         {win.type === 'ABOUT' && (
                             <div className="flex flex-col gap-6 p-2 font-mono text-sm">
                                 <div className="border-2 border-neon-gold p-4 bg-neon-gold/5 shadow-glow-gold relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-1 bg-neon-gold text-black text-xs font-bold">ALPHA BUILD</div>
+                                    <div className="absolute top-0 right-0 p-1 bg-neon-gold text-black text-xs font-bold">RELEASE BUILD</div>
                                     <h1 className="text-2xl font-bold text-neon-gold mb-1">SYSTEM_DECODE_MAGIS</h1>
                                     <p className="text-neon-gold/80">VERSION: 12.0 FLUX</p>
                                     <p className="text-white/60 text-xs mt-2">ID: 8823-X99-MAGIS</p>
@@ -222,18 +221,18 @@ const App: React.FC = () => {
                                         <h2 className="text-neon-purple font-bold mb-2 border-b border-neon-purple/50 pb-1">NEURAL CORES</h2>
                                         <ul className="space-y-2 text-white/80 text-xs">
                                             <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-purple"></div>Gemini 2.5 Flash (Core)</li>
-                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-purple"></div>Gemini 3.0 Pro (Thinking)</li>
+                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-purple"></div>Gemini 3.1 Pro (Thinking)</li>
                                             <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-purple"></div>Veo 3.1 (Generative Video)</li>
-                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-purple"></div>Imagen 3 (Visual Synth)</li>
+                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-purple"></div>Nano Banana Pro (Visual Synth)</li>
                                         </ul>
                                     </div>
                                     <div>
                                         <h2 className="text-neon-cyan font-bold mb-2 border-b border-neon-cyan/50 pb-1">SYSTEM SPECS</h2>
                                         <ul className="space-y-2 text-white/80 text-xs">
-                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-cyan"></div>Latency: &lt;50ms</li>
+                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-cyan"></div>Latency: NETWORK-DEPENDENT</li>
                                             <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-cyan"></div>Audio: 24kHz PCM</li>
-                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-cyan"></div>Encryption: Quantum-Safe</li>
-                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-cyan"></div>Uptime: 99.99%</li>
+                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-cyan"></div>Transport: HTTPS/TLS</li>
+                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-cyan"></div>Uptime: DEPLOYMENT-DEPENDENT</li>
                                         </ul>
                                     </div>
                                 </div>
