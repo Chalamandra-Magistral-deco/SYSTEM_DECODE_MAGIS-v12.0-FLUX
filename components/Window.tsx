@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Minus } from 'lucide-react';
 
 interface WindowProps {
-  id: string;
   title: string;
   isOpen: boolean;
   isMinimized: boolean;
@@ -14,11 +12,10 @@ interface WindowProps {
   color: string;
   icon: React.ReactNode;
   children: React.ReactNode;
-  width?: string;
 }
 
 const Window: React.FC<WindowProps> = ({
-  id, title, isOpen, isMinimized, zIndex, initialPosition, onClose, onMinimize, onFocus, color, icon, children, width = 'w-[550px]'
+  title, isOpen, isMinimized, zIndex, initialPosition, onClose, onMinimize, onFocus, color, icon, children
 }) => {
   const [position, setPosition] = useState(initialPosition);
   const [isDragging, setIsDragging] = useState(false);
