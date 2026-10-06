@@ -1,7 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { generateImage, generateVideo, generateSpeech, analyzeVideo, openApiKeySelection, checkApiKeySelection } from '../services/geminiService';
+import { generateImage, generateVideo, generateSpeech, analyzeVideo } from '../services/geminiService';
 import { MediaType } from '../types';
 import { Video, Image as ImageIcon, Mic, Film } from 'lucide-react';
+
+const MAX_VIDEO_BYTES = 3_000_000;
+
+const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Unable to read video file.'));
+    reader.onload = () => {
+        if (typeof reader.result !== 'string') {
+            reject(new Error('Unable to encode video file.'));
+            return;
+        }
+        resolve(reader.result);
+    };
+    reader.readAsDataURL(file);
+});
 
 const MediaStudio: React.FC = () => {
     const [activeTab, setActiveTab] = useState<MediaType>(MediaType.VIDEO_GEN);
@@ -9,47 +24,41 @@ const MediaStudio: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [output, setOutput] = useState<string | null>(null);
     const [status, setStatus] = useState('');
-    const [showKeyWarning, setShowKeyWarning] = useState(false);
-    
-    // Configs
+
     const [aspectRatio, setAspectRatio] = useState<string>('16:9');
     const [imageSize, setImageSize] = useState<'1K'|'2K'|'4K'>('1K');
-    
-    // Audio Context
     const audioContextRef = useRef<AudioContext | null>(null);
-
-    // Video Analysis Input
     const [file, setFile] = useState<File | null>(null);
 
     useEffect(() => {
-        setShowKeyWarning(false);
         setStatus('');
         setOutput(null);
     }, [activeTab]);
 
+    useEffect(() => {
+        return () => {
+            void audioContextRef.current?.close();
+            audioContextRef.current = null;
+        };
+    }, []);
+
     const handleGenerate = async () => {
+        if (loading) return;
+
         setLoading(true);
         setOutput(null);
         setStatus('INITIALIZING...');
-        setShowKeyWarning(false);
 
         try {
             if (activeTab === MediaType.VIDEO_GEN) {
-                const hasKey = await checkApiKeySelection();
-                if (!hasKey) {
-                    setStatus('ACCESS DENIED: API KEY REQUIRED');
-                    setShowKeyWarning(true);
-                    setLoading(false);
-                    return;
-                }
-
+                const ratio = aspectRatio === '9:16' ? '9:16' : '16:9';
                 setStatus('WARMING UP VEO-3.1...');
-                const videoUrl = await generateVideo(prompt, aspectRatio as '16:9' | '9:16');
+                const videoUrl = await generateVideo(prompt, ratio);
                 setOutput(videoUrl);
                 setStatus('RENDER COMPLETE.');
-            } 
+            }
             else if (activeTab === MediaType.IMAGE_GEN) {
-                setStatus('CONFIGURING NANO BANANA PRO...');
+                setStatus('CONFIGURING NANO BANANA 2...');
                 const b64 = await generateImage(prompt, aspectRatio, imageSize);
                 setOutput(b64);
                 setStatus('GENERATION COMPLETE.');
@@ -57,71 +66,65 @@ const MediaStudio: React.FC = () => {
             else if (activeTab === MediaType.TTS) {
                 setStatus('SYNTHESIZING SPEECH...');
                 const b64Audio = await generateSpeech(prompt);
-                
-                // Play audio
+
                 if (!audioContextRef.current) {
-                    audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 24000});
+                    const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
+                    if (!AudioContextCtor) throw new Error('Web Audio API is unavailable.');
+                    audioContextRef.current = new AudioContextCtor({sampleRate: 24000});
                 }
+
                 const ctx = audioContextRef.current;
-                
-                // Decode
                 const binaryString = atob(b64Audio);
                 const len = binaryString.length;
                 const bytes = new Uint8Array(len);
-                for (let i = 0; i < len; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                
-                // Gemini TTS returns raw PCM 24kHz mono typically.
-                // Ensure we have an even number of bytes for Int16Array
-                const alignedLen = len % 2 === 0 ? len : len - 1;
+                for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
+
+                const alignedLen = len - (len % 2);
                 const dataInt16 = new Int16Array(bytes.buffer, 0, alignedLen / 2);
-                
                 const buffer = ctx.createBuffer(1, dataInt16.length, 24000);
                 const channelData = buffer.getChannelData(0);
+
                 for (let i = 0; i < dataInt16.length; i++) {
                     channelData[i] = dataInt16[i] / 32768.0;
                 }
-                
+
                 const source = ctx.createBufferSource();
                 source.buffer = buffer;
                 source.connect(ctx.destination);
                 source.start();
-                
+
                 setStatus('PLAYBACK STARTED.');
             }
             else if (activeTab === MediaType.VIDEO_ANALYSIS) {
                 if (!file) {
                     setStatus('ERROR: NO VIDEO FILE SELECTED');
-                    setLoading(false);
                     return;
                 }
-                setStatus('UPLOADING TO GEMINI 3 PRO...');
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onloadend = async () => {
-                    const b64 = reader.result as string;
-                    try {
-                        const analysis = await analyzeVideo(b64, file.type, prompt || "Analyze this video");
-                        setOutput(analysis ?? 'NO ANALYSIS RETURNED.');
-                        setStatus('ANALYSIS COMPLETE.');
-                    } catch (err: any) {
-                         setStatus('ERROR: ' + err.message);
-                    }
-                    setLoading(false);
-                };
-                return; // Async handled in callback
+                if (file.size > MAX_VIDEO_BYTES) {
+                    setStatus('ERROR: VIDEO MUST BE 3 MB OR SMALLER');
+                    return;
+                }
+
+                setStatus('ANALYZING VIDEO...');
+                const b64 = await readFileAsDataUrl(file);
+                const analysis = await analyzeVideo(
+                    b64,
+                    file.type || 'video/mp4',
+                    prompt || 'Analyze this video'
+                );
+                setOutput(analysis ?? 'NO ANALYSIS RETURNED.');
+                setStatus('ANALYSIS COMPLETE.');
             }
         } catch (e: any) {
-            setStatus(`ERROR: ${e.message}`);
             console.error(e);
+            setStatus(`ERROR: ${e?.message || 'Request failed.'}`);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     return (
         <div className="flex flex-col h-full text-neon-red font-mono">
-            {/* Tabs */}
             <div className="flex border-b border-neon-red/30 mb-4">
                 {[
                     { id: MediaType.VIDEO_GEN, icon: <Video size={16} />, label: 'VEO VIDEO' },
@@ -130,6 +133,7 @@ const MediaStudio: React.FC = () => {
                     { id: MediaType.VIDEO_ANALYSIS, icon: <Film size={16} />, label: 'VIDEO IQ' },
                 ].map(tab => (
                     <button
+                        type="button"
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={`flex items-center gap-2 px-4 py-2 text-sm transition-colors ${activeTab === tab.id ? 'bg-neon-red text-black font-bold' : 'hover:bg-neon-red/20'}`}
@@ -140,32 +144,42 @@ const MediaStudio: React.FC = () => {
             </div>
 
             <div className="flex-1 overflow-auto flex flex-col gap-4">
-                {/* Config Controls */}
                 <div className="grid grid-cols-2 gap-4">
                     {activeTab !== MediaType.TTS && activeTab !== MediaType.VIDEO_ANALYSIS && (
                         <div className="flex flex-col gap-1">
-                            <label className="text-xs opacity-70">ASPECT RATIO</label>
-                            <select 
-                                value={aspectRatio} 
+                            <label className="text-xs opacity-70" htmlFor="media-aspect-ratio">ASPECT RATIO</label>
+                            <select
+                                id="media-aspect-ratio"
+                                value={activeTab === MediaType.VIDEO_GEN ? (aspectRatio === '9:16' ? '9:16' : '16:9') : aspectRatio}
                                 onChange={(e) => setAspectRatio(e.target.value)}
                                 className="bg-black border border-neon-red text-neon-red p-1 text-sm outline-none"
                             >
-                                <option value="1:1">1:1 (Square)</option>
-                                <option value="16:9">16:9 (Landscape)</option>
-                                <option value="9:16">9:16 (Portrait)</option>
-                                <option value="4:3">4:3</option>
-                                <option value="3:4">3:4</option>
-                                <option value="21:9">21:9 (Cinema)</option>
+                                {activeTab === MediaType.VIDEO_GEN ? (
+                                    <>
+                                        <option value="16:9">16:9 (Landscape)</option>
+                                        <option value="9:16">9:16 (Portrait)</option>
+                                    </>
+                                ) : (
+                                    <>
+                                        <option value="1:1">1:1 (Square)</option>
+                                        <option value="16:9">16:9 (Landscape)</option>
+                                        <option value="9:16">9:16 (Portrait)</option>
+                                        <option value="4:3">4:3</option>
+                                        <option value="3:4">3:4</option>
+                                        <option value="21:9">21:9 (Cinema)</option>
+                                    </>
+                                )}
                             </select>
                         </div>
                     )}
-                    
+
                     {activeTab === MediaType.IMAGE_GEN && (
-                         <div className="flex flex-col gap-1">
-                            <label className="text-xs opacity-70">SIZE</label>
-                            <select 
-                                value={imageSize} 
-                                onChange={(e) => setImageSize(e.target.value as any)}
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs opacity-70" htmlFor="media-image-size">SIZE</label>
+                            <select
+                                id="media-image-size"
+                                value={imageSize}
+                                onChange={(e) => setImageSize(e.target.value as '1K'|'2K'|'4K')}
                                 className="bg-black border border-neon-red text-neon-red p-1 text-sm outline-none"
                             >
                                 <option value="1K">1K</option>
@@ -176,44 +190,33 @@ const MediaStudio: React.FC = () => {
                     )}
 
                     {activeTab === MediaType.VIDEO_ANALYSIS && (
-                         <div className="flex flex-col gap-1 col-span-2">
-                             <label className="text-xs opacity-70">INPUT SOURCE</label>
-                             <input 
-                                type="file" 
-                                accept="video/*" 
-                                onChange={(e) => setFile(e.target.files?.[0] || null)} 
-                                className="text-sm file:bg-neon-red file:text-black file:border-0 file:mr-4 file:py-1 file:px-2 file:font-mono file:font-bold hover:file:bg-neon-red/80 cursor-pointer" 
-                             />
-                         </div>
+                        <div className="flex flex-col gap-1 col-span-2">
+                            <label className="text-xs opacity-70" htmlFor="video-source">INPUT SOURCE</label>
+                            <input
+                                id="video-source"
+                                type="file"
+                                accept="video/*"
+                                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                                className="text-sm file:bg-neon-red file:text-black file:border-0 file:mr-4 file:py-1 file:px-2 file:font-mono file:font-bold hover:file:bg-neon-red/80 cursor-pointer"
+                            />
+                            <span className="text-[10px] opacity-60">MAX 3 MB</span>
+                        </div>
                     )}
                 </div>
 
-                {/* Prompt Input */}
                 <div className="flex flex-col gap-1">
-                     <label className="text-xs opacity-70">PROMPT INSTRUCTION</label>
-                     <textarea 
+                    <label className="text-xs opacity-70" htmlFor="media-prompt">PROMPT INSTRUCTION</label>
+                    <textarea
+                        id="media-prompt"
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         className="w-full bg-black/50 border border-neon-red text-white p-3 min-h-[80px] outline-none focus:shadow-glow-red"
                         placeholder={activeTab === MediaType.VIDEO_ANALYSIS ? "Ask something about the video..." : "Describe the output..."}
-                     />
+                    />
                 </div>
 
-                {/* API Key Warning */}
-                {showKeyWarning && (
-                    <div className="border border-neon-gold bg-neon-gold/10 p-3 mb-2 animate-pulse">
-                        <div className="text-neon-gold text-xs font-bold mb-2">⚠ ACCESS RESTRICTED: PAID API KEY REQUIRED</div>
-                        <button 
-                            onClick={openApiKeySelection}
-                            className="w-full bg-neon-gold text-black font-bold text-xs py-2 hover:bg-white transition-colors"
-                        >
-                            AUTHENTICATE KEY
-                        </button>
-                    </div>
-                )}
-
-                {/* Action Button */}
-                <button 
+                <button
+                    type="button"
                     onClick={handleGenerate}
                     disabled={loading}
                     className="w-full py-3 bg-neon-red/10 border border-neon-red hover:bg-neon-red hover:text-black transition-all font-bold tracking-widest"
@@ -221,12 +224,10 @@ const MediaStudio: React.FC = () => {
                     {loading ? 'PROCESSING...' : 'EXECUTE'}
                 </button>
 
-                {/* Status Log */}
                 <div className="font-mono text-xs text-neon-red/70 border-t border-dashed border-neon-red/30 pt-2">
                     {'>'} SYSTEM_LOG: {status}
                 </div>
 
-                {/* Output Display */}
                 {output && (
                     <div className="flex-1 bg-black/50 border border-neon-red/30 flex items-center justify-center p-2 min-h-[200px] relative overflow-hidden">
                         {activeTab === MediaType.VIDEO_GEN && (
