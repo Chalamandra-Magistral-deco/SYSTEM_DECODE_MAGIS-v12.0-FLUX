@@ -52,7 +52,7 @@ La credencial persistente de Gemini permanece en el servidor.
 - **Gemini 2.5 Flash / Flash-Lite:** operaciones rápidas y búsqueda.
 - **Gemini 3.8 Flash:** análisis y razonamiento general de alta capacidad.
 - **Gemini 3.1 Flash Image:** generación de imagen.
-- **Veo 3.1 Fast:** generación de video.
+- **Veo 3.1:** generación de video.
 - **Gemini 3.8 Flash TTS:** síntesis de voz.
 - **Gemini 3.8 Live:** conversación de voz de baja latencia.
 
