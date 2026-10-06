@@ -188,7 +188,7 @@ async function handleVideoStart(ai, payload) {
   const aspectRatio = requireOneOf(payload.aspectRatio || "16:9", ["16:9", "9:16"], "Aspect ratio");
 
   const operation = await ai.models.generateVideos({
-    model: "veo-3.1-fast-generate-preview",
+    model: "veo-3.1-generate-preview",
     prompt,
     config: {
       numberOfVideos: 1,
