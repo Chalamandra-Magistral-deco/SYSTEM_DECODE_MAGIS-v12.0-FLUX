@@ -26,6 +26,10 @@ body {
   margin: 0;
   background-color: #000;
   overflow: hidden;
+}
+
+.no-select,
+.no-select * {
   user-select: none;
 }
 
