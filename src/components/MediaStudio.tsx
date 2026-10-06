@@ -42,6 +42,10 @@ const MediaStudio: React.FC = () => {
         };
     }, []);
 
+    useEffect(() => () => {
+        if (output?.startsWith('blob:')) URL.revokeObjectURL(output);
+    }, [output]);
+
     const handleGenerate = async () => {
         if (loading) return;
 

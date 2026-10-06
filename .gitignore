@@ -43,3 +43,5 @@ lerna-debug.log*
 .Trashes
 ehthumbs.db
 Thumbs.db
+.vercel
+.env*

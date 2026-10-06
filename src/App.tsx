@@ -1,6 +1,8 @@
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import Window from './components/Window';
 import DesktopIcon from './components/DesktopIcon';
+import AuthScreen from './components/AuthScreen';
+import { supabase, supabaseConfigured } from './services/supabaseClient';
 
 const MatrixAnalyzer = lazy(() => import('./components/MatrixAnalyzer'));
 const Terminal = lazy(() => import('./components/Terminal'));
@@ -93,6 +95,37 @@ const ParticleBackground = () => {
 };
 
 const App: React.FC = () => {
+    const [authReady, setAuthReady] = useState(false);
+    const [authenticated, setAuthenticated] = useState(false);
+    const [userEmail, setUserEmail] = useState('');
+
+    useEffect(() => {
+        if (!supabase) {
+            setAuthReady(true);
+            return;
+        }
+
+        let active = true;
+        void supabase.auth.getSession().then(({ data, error }) => {
+            if (!active) return;
+            if (error) console.error('MAGIS_SESSION_ERROR', error);
+            setAuthenticated(Boolean(data.session));
+            setUserEmail(data.session?.user.email || 'AUTHENTICATED USER');
+            setAuthReady(true);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setAuthenticated(Boolean(session));
+            setUserEmail(session?.user.email || 'AUTHENTICATED USER');
+            setAuthReady(true);
+        });
+
+        return () => {
+            active = false;
+            subscription.unsubscribe();
+        };
+    }, []);
+
     // Initial Window States
     const [windows, setWindows] = useState<WindowState[]>([
         { id: 'chalamandra', title: 'CHALAMANDRA_CORE.exe', isOpen: true, zIndex: 10, position: { x: 100, y: 50 }, isMinimized: false, type: 'CHALAMANDRA' },
@@ -142,6 +175,14 @@ const App: React.FC = () => {
          setWindows(prev => prev.map(w => w.id === id ? { ...w, isMinimized: true } : w));
     };
 
+    if (!authReady) {
+        return <div className="flex min-h-screen items-center justify-center bg-black font-mono text-neon-cyan">LOADING AUTHENTICATION...</div>;
+    }
+
+    if (!supabaseConfigured || !authenticated) {
+        return <AuthScreen />;
+    }
+
     return (
         <div className="relative w-screen h-screen bg-bg-dark text-white overflow-hidden font-rajdhani">
             <ParticleBackground />
@@ -155,7 +196,16 @@ const App: React.FC = () => {
                 <div className="font-mono text-neon-purple animate-pulse">
                      MAGIS_OS // v12.0 FLUX
                 </div>
-                <div className="font-mono text-neon-gold text-sm">USER: ELITE_1_PERCENT</div>
+                <div className="flex items-center gap-3 font-mono text-neon-gold text-sm">
+                    <span>{userEmail}</span>
+                    <button
+                        type="button"
+                        onClick={() => void supabase?.auth.signOut()}
+                        className="border border-neon-gold px-2 py-1 hover:bg-neon-gold hover:text-black"
+                    >
+                        SIGN OUT
+                    </button>
+                </div>
             </div>
 
             {/* Desktop Area */}

@@ -1,3 +1,13 @@
+import { randomUUID } from "node:crypto";
+import {
+  assertRefundConfigured,
+  authorizeRequest,
+  consumeCredits,
+  refundCredits,
+  CREDIT_COSTS,
+  sendJson,
+} from "../lib/commercial.js";
+
 const apiKey = () => process.env.GEMINI_API_KEY || process.env.API_KEY || "";
 
 const buckets = globalThis.__MAGIS_LIVE_RATE_LIMIT__ || new Map();
@@ -32,22 +42,29 @@ export default async function handler(req, res) {
 
   const retryAfter = limited(req);
   if (retryAfter) {
-    res.statusCode = 429;
-    res.setHeader("Retry-After", String(retryAfter));
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.end(JSON.stringify({ error: "Live token rate limit exceeded." }));
-    return;
+    return sendJson(res, 429, { error: "Live token rate limit exceeded." }, {
+      "Retry-After": String(retryAfter),
+    });
   }
 
-  const key = apiKey();
-  if (!key) {
-    res.statusCode = 503;
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.end(JSON.stringify({ error: "Server AI credentials are not configured." }));
-    return;
-  }
-
+  let user;
+  let client;
+  let operationId;
+  let charged = false;
   try {
+    ({ user, client } = await authorizeRequest(req));
+    assertRefundConfigured();
+    operationId = randomUUID();
+    await consumeCredits(client, user.id, operationId, "live", CREDIT_COSTS.live);
+    charged = true;
+
+    const key = apiKey();
+    if (!key) {
+      const error = new Error("Server AI credentials are not configured.");
+      error.statusCode = 503;
+      throw error;
+    }
+
     const now = Date.now();
     const response = await fetch("https://generativelanguage.googleapis.com/v1beta/auth_tokens", {
       method: "POST",
@@ -78,15 +95,29 @@ export default async function handler(req, res) {
     const token = data?.name;
     if (!token) throw new Error("Live token was not returned.");
 
-    res.statusCode = 200;
-    res.setHeader("Cache-Control", "no-store");
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.end(JSON.stringify({ token }));
+    return sendJson(res, 200, { token });
   } catch (error) {
+    if (charged) {
+      try {
+        await refundCredits(user.id, operationId, "live_token_provisioning_failed");
+      } catch (refundError) {
+        console.error("MAGIS_LIVE_CREDIT_REFUND_ERROR", {
+          operationId,
+          userId: user.id,
+          error: refundError?.message,
+        });
+        return sendJson(res, 502, {
+          error: "Live token provisioning failed and its credit refund could not be confirmed. Contact support.",
+        });
+      }
+    }
+
     console.error("MAGIS_LIVE_TOKEN_ERROR", error);
-    res.statusCode = 502;
-    res.setHeader("Cache-Control", "no-store");
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.end(JSON.stringify({ error: "Live service unavailable." }));
+    const status = Number(error?.statusCode) || 502;
+    return sendJson(res, status, {
+      error: status === 402 ? "Insufficient credits." : status === 401
+        ? "Authentication required."
+        : "Live service unavailable.",
+    });
   }
 }

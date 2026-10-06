@@ -18,5 +18,8 @@
     "skipLibCheck": true,
     "allowJs": true
   },
-  "include": ["main.tsx", "App.tsx", "types.ts", "components/**/*", "services/**/*"]
+  "include": [
+    "src/**/*",
+    "api/**/*"
+  ]
 }

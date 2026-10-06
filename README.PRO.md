@@ -157,7 +157,7 @@ Esto conecta MAGIS con la arquitectura mayor de Chalamandra Agent Engine sin obl
 Seguridad, modelos vigentes, headers, validación y limpieza técnica.
 
 ### P1 — Monetización
-Autenticación, créditos, límites por usuario, medición de coste, eventos de conversión y checkout.
+Base de autenticación y débito server-side de créditos implementada; requiere validar Supabase de producción. Pendiente: límites distribuidos, coste real por operación, eventos de conversión y checkout.
 
 ### P2 — Escala
 Persistencia, observabilidad, router de capacidades/modelos, optimización de margen, upsell y recompra.

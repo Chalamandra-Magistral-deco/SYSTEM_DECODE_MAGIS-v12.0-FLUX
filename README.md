@@ -4,7 +4,7 @@
 
 ## Estado
 
-La aplicación funciona como una SPA React/Vite desplegada en Vercel. La capa de IA se ejecuta mediante un **gateway server-side** para evitar exponer la credencial persistente de Gemini al navegador.
+La aplicación funciona como una SPA React/Vite desplegada en Vercel. El acceso a módulos de IA requiere una sesión Supabase; el gateway valida el usuario y descuenta créditos antes de iniciar cada operación cobrada.
 
 ### Flujo de producción
 
@@ -43,10 +43,44 @@ La credencial persistente `GEMINI_API_KEY` **no se inyecta en el bundle del nave
 - `api/gemini.js` centraliza las operaciones de IA.
 - `api/live-token.js` entrega tokens efímeros para Live.
 - `api/video.js` sirve el resultado de Veo sin entregar la clave al cliente.
+- Los endpoints validan el JWT Supabase y consumen importes de crédito fijados en servidor.
+- Los fallos del proveedor activan un reembolso mediante una credencial Supabase server-only.
+- El proxy de video requiere sesión autenticada y solo acepta rutas de archivos generados en el host de Google.
 - El comando `login [key]` fue eliminado; las claves ya no se guardan en `localStorage`.
-- Hay límites de frecuencia y validación básica de entradas en los endpoints.
+- Hay límites de frecuencia por instancia y validación básica; no sustituyen límites distribuidos ni controles avanzados de abuso.
 
-**Producción:** configurar `GEMINI_API_KEY` exclusivamente como variable de entorno del proyecto Vercel.
+### Configuración de entorno
+
+Variables del cliente (solo URL y clave publicable; se incorporan al bundle):
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+Variables server-side en Vercel:
+
+- `GEMINI_API_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` — exclusivamente server-side; nunca usar prefijo `VITE_`.
+
+Aplicar las migraciones de `supabase/migrations/` al proyecto Supabase real. Configurar Auth, dominios de redirección, correo y CSP para el dominio de producción. La CSP incluida permite dominios `*.supabase.co`; los dominios Supabase personalizados requieren actualizarla.
+
+### Tarifas provisionales
+
+El importe lo determina el servidor; el cliente no puede elegir ni reducir el débito:
+
+| Operación | Créditos |
+| --- | ---: |
+| Texto | 1 |
+| Razonamiento | 3 |
+| Búsqueda | 1 |
+| Imagen | 25 |
+| Voz TTS | 5 |
+| Inicio de generación de video | 50 |
+| Análisis de video | 3 |
+| Inicio de sesión Live | 5 |
+
+Son valores provisionales aprobados para esta implementación, todavía no contrastados con costes reales del proveedor. Consultar estado de video no vuelve a cobrar. Checkout, facturación, créditos de pago y conciliación siguen pendientes.
 
 ## Desarrollo
 
@@ -67,10 +101,11 @@ pnpm preview
 ## Estructura
 
 ```text
-App.tsx
-main.tsx
-components/
-services/
+src/App.tsx
+src/main.tsx
+src/components/
+src/services/
+src/core/
 api/
 styles.css
 index.html
@@ -115,11 +150,10 @@ No introducir funcionalidades solo por aumentar el tamaño del sistema. Cada cam
 - Limpieza de rutas y entrypoints obsoletos.
 
 ### P1 — Producto vendible
-- Autenticación de usuario.
-- Créditos / límites por usuario.
-- Registro de uso y coste por operación.
+- Autenticación y débito de créditos por ejecución: base implementada; falta validar migraciones, RLS y despliegue en Supabase real.
+- Registro de uso y coste real por operación, límites distribuidos y observabilidad.
 - Eventos de conversión.
-- CTA y checkout conectados a una oferta real.
+- CTA, checkout y conciliación conectados a una oferta real.
 
 ### P2 — Escala
 - Persistencia de uso y margen.
