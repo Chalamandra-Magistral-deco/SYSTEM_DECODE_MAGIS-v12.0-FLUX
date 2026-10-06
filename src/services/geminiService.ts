@@ -1,6 +1,16 @@
 import { GoogleGenAI, Modality } from "@google/genai";
+import { supabase } from "./supabaseClient";
 
 type ApiResponse = Record<string, unknown>;
+
+const authenticatedHeaders = async () => {
+    if (!supabase) throw new Error('Supabase is not configured.');
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    const accessToken = data.session?.access_token;
+    if (!accessToken) throw new Error('Sign in to use MAGIS.');
+    return { Authorization: `Bearer ${accessToken}` };
+};
 
 const requestApi = async <T extends ApiResponse>(
     action: string,
@@ -8,7 +18,10 @@ const requestApi = async <T extends ApiResponse>(
 ): Promise<T> => {
     const response = await fetch('/api/gemini', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            ...await authenticatedHeaders(),
+        },
         body: JSON.stringify({ action, payload }),
     });
 
@@ -65,7 +78,7 @@ export const generateVideo = async (
     aspectRatio: '16:9' | '9:16',
     _startImageBase64?: string
 ) => {
-    const start = await requestApi<{ operationName: string }>('videoStart', {
+    const start = await requestApi<{ operationId: string }>('videoStart', {
         prompt,
         aspectRatio,
     });
@@ -73,13 +86,18 @@ export const generateVideo = async (
     for (let attempt = 0; attempt < 60; attempt += 1) {
         await new Promise(resolve => setTimeout(resolve, 5000));
 
-        const status = await requestApi<{ done: boolean; videoUri?: string | null }>('videoStatus', {
-            operationName: start.operationName,
+        const status = await requestApi<{
+            done: boolean;
+            videoUrl?: string | null;
+        }>('videoStatus', {
+            operationId: start.operationId,
         });
 
         if (status.done) {
-            if (!status.videoUri) throw new Error('Video generation completed without a media URI.');
-            return '/api/video?uri=' + encodeURIComponent(status.videoUri);
+            if (!status.videoUrl) {
+                throw new Error('Video generation completed without a media URL.');
+            }
+            return fetchGeneratedVideo(status.videoUrl);
         }
     }
 
@@ -91,7 +109,11 @@ export const generateSpeech = async (text: string) => {
     return data.audio;
 };
 
-export const analyzeVideo = async (videoBase64: string, mimeType: string, prompt: string) => {
+export const analyzeVideo = async (
+    videoBase64: string,
+    mimeType: string,
+    prompt: string
+) => {
     const data = await requestApi<{ text: string }>('videoAnalysis', {
         videoBase64,
         mimeType,
@@ -104,7 +126,10 @@ export const analyzeVideo = async (videoBase64: string, mimeType: string, prompt
 export const getLiveClient = async () => {
     const response = await fetch('/api/live-token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            ...await authenticatedHeaders(),
+        },
     });
 
     const data = await response.json().catch(() => ({}));
@@ -113,6 +138,23 @@ export const getLiveClient = async () => {
     }
 
     return new GoogleGenAI({ apiKey: data.token });
+};
+
+export const fetchGeneratedVideo = async (videoUrl: string) => {
+    const response = await fetch(videoUrl, {
+        headers: await authenticatedHeaders(),
+    });
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(
+            typeof data.error === 'string'
+                ? data.error
+                : 'Unable to download generated video.'
+        );
+    }
+
+    return URL.createObjectURL(await response.blob());
 };
 
 export { Modality };

@@ -1,4 +1,18 @@
 import { GoogleGenAI, Modality } from "@google/genai";
+import { randomUUID } from "node:crypto";
+import {
+  assertRefundConfigured,
+  authorizeRequest,
+  consumeCredits,
+  refundCredits,
+  CREDIT_COSTS,
+  sendJson,
+  createVideoOperation,
+  bindVideoProviderOperation,
+  getVideoOperation,
+  completeVideoOperation,
+  failVideoOperation,
+} from "../lib/commercial.js";
 
 const apiKey = () => process.env.GEMINI_API_KEY || process.env.API_KEY || "";
 
@@ -24,14 +38,6 @@ function rateLimit(req, bucket, limit, windowMs) {
 
   current.count += 1;
   return true;
-}
-
-function sendJson(res, status, payload, extraHeaders = {}) {
-  res.statusCode = status;
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.setHeader("Cache-Control", "no-store");
-  Object.entries(extraHeaders).forEach(([key, value]) => res.setHeader(key, value));
-  res.end(JSON.stringify(payload));
 }
 
 function getBody(req) {
@@ -183,42 +189,117 @@ async function handleSpeech(ai, payload) {
   return { audio };
 }
 
-async function handleVideoStart(ai, payload) {
+async function handleVideoStart(ai, payload, userId, operationId) {
   const prompt = requireString(payload.prompt, "Prompt", 8000);
-  const aspectRatio = requireOneOf(payload.aspectRatio || "16:9", ["16:9", "9:16"], "Aspect ratio");
+  const aspectRatio = requireOneOf(
+    payload.aspectRatio || "16:9",
+    ["16:9", "9:16"],
+    "Aspect ratio"
+  );
 
-  const operation = await ai.models.generateVideos({
-    model: "veo-3.1-generate-preview",
-    prompt,
-    config: {
-      numberOfVideos: 1,
-      resolution: "720p",
-      aspectRatio,
-    },
-  });
+  await createVideoOperation(userId, operationId);
 
-  if (!operation?.name) throw new Error("Video generation did not return an operation id.");
+  try {
+    const operation = await ai.models.generateVideos({
+      model: "veo-3.1-generate-preview",
+      prompt,
+      config: {
+        numberOfVideos: 1,
+        resolution: "720p",
+        aspectRatio,
+      },
+    });
 
-  return { operationName: operation.name };
+    if (!operation?.name) {
+      throw new Error("Video generation did not return an operation id.");
+    }
+
+    await bindVideoProviderOperation(
+      userId,
+      operationId,
+      operation.name,
+    );
+
+    return { operationId };
+  } catch (error) {
+    try {
+      await failVideoOperation(userId, operationId);
+    } catch (recordError) {
+      console.error("MAGIS_VIDEO_OPERATION_RECORD_ERROR", {
+        operationId,
+        userId,
+        error: recordError?.message,
+      });
+    }
+
+    throw error;
+  }
 }
 
-async function handleVideoStatus(ai, payload) {
-  const operationName = requireString(payload.operationName, "Operation name", 500);
-  if (!/^[A-Za-z0-9._:/-]+$/.test(operationName)) {
-    const error = new Error("Operation name is invalid.");
+async function handleVideoStatus(ai, payload, userId) {
+  const operationId = requireString(
+    payload.operationId,
+    "Operation id",
+    100,
+  );
+
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      operationId,
+    )
+  ) {
+    const error = new Error("Operation id is invalid.");
     error.statusCode = 400;
     throw error;
   }
 
+  const owned = await getVideoOperation(userId, operationId);
+
+  if (!owned) {
+    const error = new Error("Video operation not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (owned.status === "failed") {
+    return {
+      done: true,
+      videoUrl: null,
+    };
+  }
+
+  if (!owned.provider_operation_name) {
+    return {
+      done: false,
+      videoUrl: null,
+    };
+  }
+
   const operation = await ai.operations.getVideosOperation({
-    operation: { name: operationName },
+    operation: {
+      name: owned.provider_operation_name,
+    },
   });
 
-  const videoUri = operation?.response?.generatedVideos?.[0]?.video?.uri || null;
+  const videoUri =
+    operation?.response?.generatedVideos?.[0]?.video?.uri || null;
+
+  if (operation?.done && videoUri) {
+    await completeVideoOperation(
+      userId,
+      operationId,
+      videoUri,
+    );
+
+    return {
+      done: true,
+      videoUrl: `/api/video?operationId=${encodeURIComponent(operationId)}`,
+    };
+  }
 
   return {
     done: Boolean(operation?.done),
-    videoUri,
+    videoUrl: null,
   };
 }
 
@@ -259,20 +340,32 @@ export default async function handler(req, res) {
 
   const body = getBody(req);
   const action = body.action;
-  const payload = body.payload || {};
-
+  const payload = body.payload && typeof body.payload === "object" ? body.payload : {};
   const expensive = ["image", "speech", "videoStart", "videoStatus", "videoAnalysis"].includes(action);
-  const bucket = expensive ? "media" : "text";
-  const limit = expensive ? 8 : 30;
-  const allowed = rateLimit(req, bucket, limit, 60_000);
-
+  const allowed = rateLimit(req, expensive ? "media" : "text", expensive ? 8 : 30, 60_000);
   if (allowed !== true) {
     return sendJson(res, 429, { error: "Rate limit exceeded. Retry shortly." }, {
       "Retry-After": String(allowed.retryAfter),
     });
   }
 
+  let user;
+  let client;
+  let operationId;
+  let charged = false;
   try {
+    ({ user, client } = await authorizeRequest(req));
+    if (!Object.hasOwn(CREDIT_COSTS, action) && action !== "videoStatus") {
+      return sendJson(res, 400, { error: "Unknown API action." });
+    }
+
+    if (action !== "videoStatus") {
+      assertRefundConfigured();
+      operationId = randomUUID();
+      await consumeCredits(client, user.id, operationId, action, CREDIT_COSTS[action]);
+      charged = true;
+    }
+
     const key = requireApiKey();
     const ai = new GoogleGenAI({ apiKey: key });
 
@@ -294,10 +387,10 @@ export default async function handler(req, res) {
         result = await handleSpeech(ai, payload);
         break;
       case "videoStart":
-        result = await handleVideoStart(ai, payload);
+        result = await handleVideoStart(ai, payload, user.id, operationId);
         break;
       case "videoStatus":
-        result = await handleVideoStatus(ai, payload);
+        result = await handleVideoStatus(ai, payload, user.id);
         break;
       case "videoAnalysis":
         result = await handleVideoAnalysis(ai, payload);
@@ -308,8 +401,27 @@ export default async function handler(req, res) {
 
     return sendJson(res, 200, result);
   } catch (error) {
+    if (charged) {
+      try {
+        await refundCredits(user.id, operationId, "ai_execution_failed");
+      } catch (refundError) {
+        console.error("MAGIS_CREDIT_REFUND_ERROR", {
+          operationId,
+          userId: user.id,
+          error: refundError?.message,
+        });
+        return sendJson(res, 502, {
+          error: "The AI request failed and its credit refund could not be confirmed. Contact support.",
+        });
+      }
+    }
+
     const status = Number(error?.statusCode) || 502;
-    const message = status >= 500 ? "AI service unavailable. Check server configuration and provider status." : String(error?.message || "Request failed.");
+    const message = status === 402
+      ? "Insufficient credits."
+      : status >= 500
+        ? "AI service unavailable. Check server configuration and provider status."
+        : String(error?.message || "Request failed.");
     console.error("MAGIS_API_ERROR", {
       action,
       status,
