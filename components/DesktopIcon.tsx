@@ -9,17 +9,23 @@ interface DesktopIconProps {
 
 const DesktopIcon: React.FC<DesktopIconProps> = ({ label, icon, colorClass, onClick }) => {
   return (
-    <div 
-      className={`group relative w-20 h-20 bg-gray-900/90 border-2 rounded-xl flex items-center justify-center cursor-pointer transition-all duration-300 hover:-translate-y-4 hover:scale-110 hover:bg-gray-800 z-10 ${colorClass}`}
+    <button
+      type="button"
+      aria-label={'Open ' + label}
+      title={label}
+      className={'group relative w-20 h-20 bg-gray-900/90 border-2 rounded-xl flex items-center justify-center cursor-pointer transition-all duration-300 hover:-translate-y-4 hover:scale-110 hover:bg-gray-800 z-10 ' + colorClass}
       onClick={onClick}
     >
-      <div className="text-4xl filter drop-shadow-lg transition-transform duration-300 group-hover:scale-110">
+      <div className="text-4xl filter drop-shadow-lg transition-transform duration-300 group-hover:scale-110" aria-hidden="true">
         {icon}
       </div>
-      <div className={`absolute -bottom-8 opacity-0 group-hover:opacity-100 group-hover:bottom-[-45px] transition-all duration-300 bg-black px-3 py-1 border text-xs font-mono whitespace-nowrap pointer-events-none z-50 ${colorClass.replace('border-', 'border-').replace('shadow-', 'shadow-')}`}>
+      <div
+        aria-hidden="true"
+        className={'absolute -bottom-8 opacity-0 group-hover:opacity-100 group-hover:bottom-[-45px] transition-all duration-300 bg-black px-3 py-1 border text-xs font-mono whitespace-nowrap pointer-events-none z-50 ' + colorClass}
+      >
         {label}
       </div>
-    </div>
+    </button>
   );
 };
 

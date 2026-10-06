@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { generateTextFast, generateSearchResponse } from '../services/geminiService';
 
@@ -28,10 +27,10 @@ const Terminal: React.FC = () => {
 
             try {
                 if (cmd.startsWith('ai ')) {
-                    const rawArgs = cmd.replace('ai ', '');
+                    const rawArgs = cmd.slice(3);
                     let userPrompt: string;
                     let systemPrompt: string;
-                    
+
                     const separator = '||';
                     if (rawArgs.includes(separator)) {
                         const parts = rawArgs.split(separator);
@@ -48,44 +47,44 @@ const Terminal: React.FC = () => {
                     } else {
                         response = "ERROR: User prompt is required for the 'ai' command.";
                     }
-                } 
-                else if (cmd.startsWith('search ')) {
-                    const query = cmd.replace('search ', '');
-                    const res = await generateSearchResponse(query);
-                    response = res.text || "No results found.";
-                    if (res.grounding) {
-                        // Very simple formatting of grounding
-                        response += "\n\nSOURCES:";
-                        res.grounding.forEach((chunk: any) => {
-                           if(chunk.web?.uri) response += `\n- ${chunk.web.title}: ${chunk.web.uri}`;
-                        });
-                    }
                 }
-                else if (cmd.startsWith('login ')) {
-                     const key = cmd.replace('login ', '').trim();
-                     localStorage.setItem('geminiKey', key);
-                     if (typeof process !== 'undefined' && process.env) {
-                         process.env.API_KEY = key; // Mock for current session
-                     }
-                     response = "NEURAL KEY UPDATED. REBOOT RECOMMENDED.";
+                else if (cmd.startsWith('search ')) {
+                    const query = cmd.slice(7).trim();
+                    if (!query) {
+                        response = "ERROR: Search query is required.";
+                    } else {
+                        const res = await generateSearchResponse(query);
+                        response = res.text || "No results found.";
+                        if (res.grounding?.length) {
+                            response += "\n\nSOURCES:";
+                            res.grounding.forEach((chunk: any) => {
+                                if (chunk.web?.uri) response += `\n- ${chunk.web.title || 'Source'}: ${chunk.web.uri}`;
+                            });
+                        }
+                    }
                 }
                 else {
                     switch (cmd.toLowerCase()) {
                         case 'help':
-                            response = "COMMANDS:\n- ai [prompt]: Fast AI Chat (Default System)\n- ai [system] || [prompt]: AI Chat with System Prompt\n- search [query]: Google Search Grounding\n- login [key]: Set API Key\n- about: System Info\n- clear: Clear terminal";
+                            response = "COMMANDS:\n- ai [prompt]: Fast AI Chat\n- ai [system] || [prompt]: AI Chat with System Prompt\n- search [query]: Google Search Grounding\n- about: System Info\n- clear: Clear terminal";
                             break;
                         case 'about':
-                            response = "SYSTEM_DECODE_MAGIS // v12.0 FLUX\n\nCORE: Google Gemini 2.5/3.0\nMODULES: Veo, Imagen, Live, Thinking\nSTATUS: ONLINE\n\nA cyberpunk OS dashboard for multimodal creation and analysis.";
+                            response = "SYSTEM_DECODE_MAGIS // v12.0 FLUX\n\nCORE: Gemini via MAGIS API gateway\nMODULES: Analysis, Search, Veo, Image, TTS, Live\nSTATUS: ONLINE\n\nAPI credentials remain server-side.";
                             break;
                         case 'clear':
                             setHistory([]);
                             setProcessing(false);
                             return;
+                        case 'login':
+                        case 'login key':
+                            response = "LOGIN DISABLED: API keys are server-managed. Use the authenticated MAGIS application.";
+                            break;
                         default:
-                            response = "UNKNOWN COMMAND.";
+                            response = "UNKNOWN COMMAND. TYPE 'help'.";
                     }
                 }
             } catch (err) {
+                console.error(err);
                 response = "ERROR EXECUTING COMMAND.";
             }
 
@@ -107,7 +106,8 @@ const Terminal: React.FC = () => {
             </div>
             <div className="flex items-center gap-2 border-t border-neon-purple/50 pt-2 mt-2">
                 <span className="text-white">{'>'}</span>
-                <input 
+                <input
+                    aria-label="Terminal command"
                     className="flex-1 bg-transparent border-none outline-none text-white placeholder-neon-purple/50"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
