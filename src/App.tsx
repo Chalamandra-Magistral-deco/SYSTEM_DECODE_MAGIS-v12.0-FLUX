@@ -264,33 +264,33 @@ const App: React.FC = () => {
                                     <div className="absolute top-0 right-0 p-1 bg-neon-gold text-black text-xs font-bold">PRODUCTION BUILD</div>
                                     <h1 className="text-2xl font-bold text-neon-gold mb-1">SYSTEM_DECODE_MAGIS</h1>
                                     <p className="text-neon-gold/80">VERSION: 12.0 FLUX</p>
-                                    <p className="text-white/60 text-xs mt-2">ID: 8823-X99-MAGIS</p>
+                                    <p className="text-white/60 text-xs mt-2">Authenticated workspace • v12.0 FLUX</p>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <h2 className="text-neon-purple font-bold mb-2 border-b border-neon-purple/50 pb-1">NEURAL CORES</h2>
                                         <ul className="space-y-2 text-white/80 text-xs">
-                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-purple"></div>Gemini 2.5 Flash (Core)</li>
-                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-purple"></div>Gemini 3.0 Pro (Thinking)</li>
-                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-purple"></div>Veo 3.1 (Generative Video)</li>
-                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-purple"></div>Imagen 3 (Visual Synth)</li>
+                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-purple"></div>Gemini gateway</li>
+                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-purple"></div>Reasoning capability</li>
+                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-purple"></div>Veo 3.1 video</li>
+                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-purple"></div>Multimodal image + speech</li>
                                         </ul>
                                     </div>
                                     <div>
                                         <h2 className="text-neon-cyan font-bold mb-2 border-b border-neon-cyan/50 pb-1">SYSTEM SPECS</h2>
                                         <ul className="space-y-2 text-white/80 text-xs">
-                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-cyan"></div>Latency: &lt;50ms</li>
-                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-cyan"></div>Audio: 24kHz PCM</li>
-                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-cyan"></div>Encryption: Quantum-Safe</li>
-                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-cyan"></div>Uptime: 99.99%</li>
+                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-cyan"></div>Auth: Supabase session</li>
+                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-cyan"></div>Billing: server-side credits</li>
+                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-cyan"></div>Video: ownership-bound proxy</li>
+                                            <li className="flex items-center gap-2"><div className="w-1 h-1 bg-neon-cyan"></div>Security: CSP + strict headers</li>
                                         </ul>
                                     </div>
                                 </div>
 
                                 <div className="text-center text-xs text-gray-500 border-t border-gray-800 pt-4">
-                                    <p>ARCHITECTED BY ELITE 1%</p>
-                                    <p className="mt-1 opacity-50">UNAUTHORIZED ACCESS IS A FELONY UNDER CYBER-LAW 77.</p>
+                                    <p>SECURE OPERATOR WORKSPACE</p>
+                                    <p className="mt-1 opacity-50">Use the module controls below to start an analysis or creation task.</p>
                                 </div>
                             </div>
                         )}
