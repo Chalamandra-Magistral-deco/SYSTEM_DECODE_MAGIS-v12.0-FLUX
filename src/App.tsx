@@ -91,7 +91,7 @@ const ParticleBackground = () => {
             cancelAnimationFrame(animationFrameId);
         };
     }, []);
-    return <canvas ref={canvasRef} className="absolute inset-0 z-0 pointer-events-none" />;
+    return <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 z-0 pointer-events-none" />;
 };
 
 const App: React.FC = () => {
@@ -242,7 +242,7 @@ const App: React.FC = () => {
                                     className="w-32 h-32 rounded-full border-4 border-neon-red shadow-[0_0_30px_#ff0055] object-cover animate-pulse"
                                 />
                                 <div className="text-4xl text-neon-purple animate-pulse text-shadow-glow">MAGIS CORE</div>
-                                <div className="text-sm font-mono text-white/70">ACCESS LEVEL: UNRESTRICTED</div>
+                                <div className="text-sm font-mono text-white/70">AUTHENTICATED OPERATOR</div>
                                 <div className="grid grid-cols-2 gap-4 w-full mt-4">
                                      <button onClick={() => toggleWindow('matrix')} className="p-4 border border-neon-gold text-neon-gold hover:bg-neon-gold hover:text-black font-bold font-mono transition-all">MATRIX</button>
                                      <button onClick={() => toggleWindow('cicd')} className="p-4 border border-neon-green text-neon-green hover:bg-neon-green hover:text-black font-bold font-mono transition-all">CI/CD</button>
@@ -261,7 +261,7 @@ const App: React.FC = () => {
                         {win.type === 'ABOUT' && (
                             <div className="flex flex-col gap-6 p-2 font-mono text-sm">
                                 <div className="border-2 border-neon-gold p-4 bg-neon-gold/5 shadow-glow-gold relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-1 bg-neon-gold text-black text-xs font-bold">ALPHA BUILD</div>
+                                    <div className="absolute top-0 right-0 p-1 bg-neon-gold text-black text-xs font-bold">PRODUCTION BUILD</div>
                                     <h1 className="text-2xl font-bold text-neon-gold mb-1">SYSTEM_DECODE_MAGIS</h1>
                                     <p className="text-neon-gold/80">VERSION: 12.0 FLUX</p>
                                     <p className="text-white/60 text-xs mt-2">ID: 8823-X99-MAGIS</p>
