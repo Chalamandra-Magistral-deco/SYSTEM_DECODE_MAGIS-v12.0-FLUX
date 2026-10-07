@@ -5,6 +5,7 @@ import AuthScreen from './components/AuthScreen';
 import { supabase, supabaseConfigured } from './services/supabaseClient';
 
 const MatrixAnalyzer = lazy(() => import('./components/MatrixAnalyzer'));
+const MatrixDecoder = lazy(() => import('./components/MatrixDecoder'));
 const Terminal = lazy(() => import('./components/Terminal'));
 const DeploymentAnalyzer = lazy(() => import('./components/DeploymentAnalyzer'));
 const MediaStudio = lazy(() => import('./components/MediaStudio'));
@@ -253,6 +254,7 @@ const App: React.FC = () => {
                         )}
                         <Suspense fallback={<div className="p-4 font-mono text-xs text-neon-cyan animate-pulse">LOADING MODULE...</div>}>
                             {win.type === 'MATRIX' && <MatrixAnalyzer stats={stats} setStats={setStats} />}
+                            {win.type === 'MATRIX' && <MatrixDecoder />}
                             {win.type === 'TERMINAL' && <Terminal />}
                             {win.type === 'CICD' && <DeploymentAnalyzer stats={stats} />}
                             {win.type === 'MEDIA' && <MediaStudio />}
