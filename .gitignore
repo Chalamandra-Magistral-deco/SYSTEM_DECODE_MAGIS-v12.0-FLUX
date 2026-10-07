@@ -45,3 +45,6 @@ ehthumbs.db
 Thumbs.db
 .vercel
 .env*
+
+# Vitest reports and artifacts
+.vitest/
