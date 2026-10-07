@@ -11,9 +11,8 @@ const Terminal = lazy(() => import('./components/Terminal'));
 const DeploymentAnalyzer = lazy(() => import('./components/DeploymentAnalyzer'));
 const MediaStudio = lazy(() => import('./components/MediaStudio'));
 const LiveConversation = lazy(() => import('./components/LiveConversation'));
-const CommercialPanel = lazy(() => import('./components/CommercialPanel'));
 import { WindowState, MatrixStats } from './types';
-import { Radar, Terminal as TerminalIcon, Cpu, Video, Mic, CreditCard, Sparkles, Info } from 'lucide-react';
+import { Radar, Terminal as TerminalIcon, Cpu, Video, Mic, Sparkles, Info } from 'lucide-react';
 import { playWindowOpen, playWindowClose, playWindowMinimize } from './services/soundService';
 
 // Canvas Particle Background
@@ -137,7 +136,6 @@ const App: React.FC = () => {
         { id: 'cicd', title: 'DEPLOYMENT_ANALYZER.sh', isOpen: false, zIndex: 13, position: { x: 400, y: 100 }, isMinimized: false, type: 'CICD' },
         { id: 'media', title: 'MEDIA_STUDIO.bin', isOpen: false, zIndex: 14, position: { x: 500, y: 50 }, isMinimized: false, type: 'MEDIA' },
         { id: 'live', title: 'NEURAL_LINK.live', isOpen: false, zIndex: 15, position: { x: 600, y: 200 }, isMinimized: false, type: 'LIVE' },
-        { id: 'commerce', title: 'MAGIS_BILLING.exe', isOpen: false, zIndex: 16, position: { x: 350, y: 120 }, isMinimized: false, type: 'COMMERCIAL' },
         { id: 'about', title: 'SYSTEM_SPECS.nfo', isOpen: false, zIndex: 16, position: { x: 300, y: 150 }, isMinimized: false, type: 'ABOUT' },
     ]);
 
@@ -228,14 +226,13 @@ const App: React.FC = () => {
                         onClose={() => closeWindow(win.id)}
                         onMinimize={() => minimizeWindow(win.id)}
                         onFocus={() => bringToFront(win.id)}
-                        color={win.type === 'MATRIX' ? 'gold' : win.type === 'CICD' ? 'green' : win.type === 'MEDIA' ? 'red' : win.type === 'LIVE' ? 'cyan' : win.type === 'ABOUT' || win.type === 'COMMERCIAL' ? 'gold' : 'purple'}
+                        color={win.type === 'MATRIX' ? 'gold' : win.type === 'CICD' ? 'green' : win.type === 'MEDIA' ? 'red' : win.type === 'LIVE' ? 'cyan' : win.type === 'ABOUT' ? 'gold' : 'purple'}
                         icon={
                             win.type === 'MATRIX' ? <Radar size={18}/> : 
                             win.type === 'CICD' ? <Cpu size={18}/> :
                             win.type === 'MEDIA' ? <Video size={18}/> :
                             win.type === 'LIVE' ? <Mic size={18}/> :
                             win.type === 'ABOUT' ? <Info size={18}/> :
-                            win.type === 'COMMERCIAL' ? <CreditCard size={18}/> :
                             win.type === 'TERMINAL' ? <TerminalIcon size={18}/> : <Sparkles size={18}/>
                         }
                     >
@@ -253,7 +250,6 @@ const App: React.FC = () => {
                                      <button onClick={() => toggleWindow('cicd')} className="p-4 border border-neon-green text-neon-green hover:bg-neon-green hover:text-black font-bold font-mono transition-all">CI/CD</button>
                                      <button onClick={() => toggleWindow('media')} className="p-4 border border-neon-red text-neon-red hover:bg-neon-red hover:text-black font-bold font-mono transition-all">STUDIO</button>
                                      <button onClick={() => toggleWindow('live')} className="p-4 border border-neon-cyan text-neon-cyan hover:bg-neon-cyan hover:text-black font-bold font-mono transition-all">LINK</button>
-                                     <button onClick={() => toggleWindow('commerce')} className="p-4 border border-neon-gold text-neon-gold hover:bg-neon-gold hover:text-black font-bold font-mono transition-all">BILLING</button>
                                 </div>
                             </div>
                         )}
@@ -265,7 +261,6 @@ const App: React.FC = () => {
                             {win.type === 'CICD' && <DeploymentAnalyzer stats={stats} />}
                             {win.type === 'MEDIA' && <MediaStudio />}
                             {win.type === 'LIVE' && <LiveConversation />}
-                            {win.type === 'COMMERCIAL' && <CommercialPanel />}
                         </Suspense>
                         {win.type === 'ABOUT' && (
                             <div className="flex flex-col gap-6 p-2 font-mono text-sm">
@@ -314,7 +309,6 @@ const App: React.FC = () => {
                  <DesktopIcon label="DEPLOY" icon={<Cpu />} colorClass="border-neon-green shadow-neon-green text-neon-green" onClick={() => toggleWindow('cicd')} />
                  <DesktopIcon label="STUDIO" icon={<Video />} colorClass="border-neon-red shadow-neon-red text-neon-red" onClick={() => toggleWindow('media')} />
                  <DesktopIcon label="LINK" icon={<Mic />} colorClass="border-neon-cyan shadow-neon-cyan text-neon-cyan" onClick={() => toggleWindow('live')} />
-                 <DesktopIcon label="STORE" icon={<CreditCard />} colorClass="border-neon-gold shadow-neon-gold text-neon-gold" onClick={() => toggleWindow('commerce')} />
                  <DesktopIcon label="TERM" icon={<TerminalIcon />} colorClass="border-neon-purple shadow-neon-purple text-neon-purple" onClick={() => toggleWindow('terminal')} />
                  <DesktopIcon label="INFO" icon={<Info />} colorClass="border-white shadow-white text-white" onClick={() => toggleWindow('about')} />
             </div>

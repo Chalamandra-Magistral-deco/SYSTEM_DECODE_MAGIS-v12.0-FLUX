@@ -5,7 +5,7 @@ export interface WindowState {
   zIndex: number;
   position: { x: number; y: number };
   isMinimized: boolean;
-  type: 'MATRIX' | 'ORACLE' | 'TERMINAL' | 'CHALAMANDRA' | 'CICD' | 'MEDIA' | 'LIVE' | 'ABOUT' | 'COMMERCIAL';
+  type: 'MATRIX' | 'ORACLE' | 'TERMINAL' | 'CHALAMANDRA' | 'CICD' | 'MEDIA' | 'LIVE' | 'ABOUT';
 }
 
 export interface MatrixStats {

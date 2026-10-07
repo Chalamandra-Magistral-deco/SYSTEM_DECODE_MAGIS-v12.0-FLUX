@@ -68,7 +68,11 @@ Variables server-side en Vercel:
 - `GEMINI_API_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` — exclusivamente server-side; nunca usar prefijo `VITE_`.
+- `SUPABASE_SECRET_KEY` — exclusivamente server-side; `SUPABASE_SERVICE_ROLE_KEY` queda como fallback legacy temporal.
+- `STRIPE_SECRET_KEY` — exclusivamente server-side.
+- `STRIPE_PRICE_STARTER` y `STRIPE_PRICE_PRO` — Price IDs de Stripe para los packs de créditos.
+- `STRIPE_WEBHOOK_SECRET` — exclusivamente server-side.
+- `MAGIS_APP_URL` — URL canónica de producción.
 
 Aplicar las migraciones de `supabase/migrations/` al proyecto Supabase real. Configurar Auth, dominios de redirección, correo y CSP para el dominio de producción. La CSP incluida permite dominios `*.supabase.co`; los dominios Supabase personalizados requieren actualizarla.
 

@@ -149,32 +149,3 @@ ESCALAR.
 
 Si la respuesta es no:
 DECODIFICAR.
-
-
-## MVP COMERCIAL ACTIVADO EN CÓDIGO
-
-MAGIS usa los planes existentes como packs de créditos de compra única:
-
-- MAGIS Free — 10 créditos iniciales
-- MAGIS Starter — 100 créditos
-- MAGIS Pro — 500 créditos
-
-Flujo:
-
-OFERTA
-↓
-CHECKOUT
-↓
-STRIPE
-↓
-WEBHOOK FIRMADO
-↓
-PURCHASE
-↓
-GRANT DE CRÉDITOS
-↓
-CREDIT_LEDGER
-↓
-USO MAGIS
-
-El precio y los créditos efectivos se validan server-side contra `public.plans`. La acreditación es idempotente mediante `provider_session_id` y `credit_ledger.reference_id`.
