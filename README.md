@@ -51,6 +51,11 @@ La credencial persistente `GEMINI_API_KEY` **no se inyecta en el bundle del nave
 - El comando `login [key]` fue eliminado; las claves ya no se guardan en `localStorage`.
 - Hay límites de frecuencia por instancia y validación básica; no sustituyen límites distribuidos ni controles avanzados de abuso.
 
+### Deuda técnica de producción
+
+- `api/video.js` materializa el video upstream completo en memoria antes de responder. Migrar a streaming con backpressure/range requiere una validación aparte; el buffer puede elevar el uso de memoria con archivos grandes.
+- La conciliación de una aceptación de proveedor incierta requiere revisión manual con el identificador de operación; no existe un reconciliador automático.
+
 ### Configuración de entorno
 
 Variables del cliente (solo URL y clave publicable; se incorporan al bundle):
