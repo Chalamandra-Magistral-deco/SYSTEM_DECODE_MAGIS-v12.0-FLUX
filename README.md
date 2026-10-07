@@ -87,7 +87,7 @@ El importe lo determina el servidor; el cliente no puede elegir ni reducir el d�
 | Análisis de video | 3 |
 | Inicio de sesión Live | 5 |
 
-Son valores provisionales aprobados para esta implementación, todavía no contrastados con costes reales del proveedor. Consultar estado de video no vuelve a cobrar. Checkout, facturación, créditos de pago y conciliación siguen pendientes.
+Son valores provisionales aprobados para esta implementación, todavía no contrastados con costes reales del proveedor. Consultar estado de video no vuelve a cobrar. MAGIS incorpora checkout de packs de créditos y acreditación server-side idempotente; activar pagos requiere configurar Stripe Products/Prices, sus variables de entorno y el webhook de producción.
 
 ## Desarrollo
 
@@ -125,6 +125,12 @@ package.json
 ```
 
 ### Capa API
+
+api/checkout.js
+  └─ Stripe Checkout para packs de créditos
+
+api/stripe-webhook.js
+  └─ conciliación y acreditación idempotente de compras
 
 ```text
 api/gemini.js
@@ -168,7 +174,8 @@ No introducir funcionalidades solo por aumentar el tamaño del sistema. Cada cam
 - Autenticación y débito de créditos por ejecución: base implementada; falta validar migraciones, RLS y despliegue en Supabase real.
 - Registro de uso y coste real por operación, límites distribuidos y observabilidad.
 - Eventos de conversión.
-- CTA, checkout y conciliación conectados a una oferta real.
+- Checkout Stripe y conciliación idempotente de compras: implementación base.
+- Configuración de productos/precios y webhook en Stripe para activación de cobros reales.
 
 ### P2 — Escala
 - Persistencia de uso y margen.
