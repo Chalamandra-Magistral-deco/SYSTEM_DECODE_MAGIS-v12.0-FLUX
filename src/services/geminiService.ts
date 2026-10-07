@@ -1,42 +1,20 @@
 import { GoogleGenAI, Modality } from "@google/genai";
-import { supabase } from "./supabaseClient";
+import { normalizeError } from "../domain/errors";
+import { authenticatedFetch, parseApiResponse } from "./apiClient";
 
-type ApiResponse = Record<string, unknown>;
-
-const authenticatedHeaders = async () => {
-    if (!supabase) throw new Error('Supabase is not configured.');
-    const { data, error } = await supabase.auth.getSession();
-    if (error) throw error;
-    const accessToken = data.session?.access_token;
-    if (!accessToken) throw new Error('Sign in to use MAGIS.');
-    return { Authorization: `Bearer ${accessToken}` };
-};
-
-const requestApi = async <T extends ApiResponse>(
+const requestApi = async <T extends Record<string, unknown>>(
     action: string,
     payload: Record<string, unknown>
 ): Promise<T> => {
-    const response = await fetch('/api/gemini', {
+    const response = await authenticatedFetch('/api/gemini', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            ...await authenticatedHeaders(),
         },
         body: JSON.stringify({ action, payload }),
     });
 
-    let data: ApiResponse = {};
-    try {
-        data = await response.json();
-    } catch {
-        data = {};
-    }
-
-    if (!response.ok) {
-        throw new Error(typeof data.error === 'string' ? data.error : 'MAGIS API request failed.');
-    }
-
-    return data as T;
+    return parseApiResponse<T>(response, 'MAGIS API request failed.');
 };
 
 // Provider credentials stay server-side. The browser only talks to MAGIS.
@@ -73,18 +51,26 @@ export const generateImage = async (
     return data.image;
 };
 
+interface VideoOperationCallbacks {
+    onOperationId?: (operationId: string) => void;
+    onPolling?: (attempt: number) => void;
+}
+
 export const generateVideo = async (
     prompt: string,
     aspectRatio: '16:9' | '9:16',
-    _startImageBase64?: string
+    _startImageBase64?: string,
+    callbacks?: VideoOperationCallbacks
 ) => {
     const start = await requestApi<{ operationId: string }>('videoStart', {
         prompt,
         aspectRatio,
     });
+    callbacks?.onOperationId?.(start.operationId);
 
     for (let attempt = 0; attempt < 60; attempt += 1) {
         await new Promise(resolve => setTimeout(resolve, 5000));
+        callbacks?.onPolling?.(attempt + 1);
 
         const status = await requestApi<{
             done: boolean;
@@ -95,13 +81,30 @@ export const generateVideo = async (
 
         if (status.done) {
             if (!status.videoUrl) {
-                throw new Error('Video generation completed without a media URL.');
+                throw normalizeError(new Error('Video generation completed without a media URL.'), 502);
             }
             return fetchGeneratedVideo(status.videoUrl);
         }
     }
 
-    throw new Error('Video generation timed out. The provider operation may still be processing.');
+    throw normalizeError(
+        new Error('Video generation timed out. The provider operation may still be processing.')
+    );
+};
+
+export const verifyVideoStatus = async (operationId: string) => {
+    const status = await requestApi<{
+        done: boolean;
+        videoUrl?: string | null;
+    }>('videoStatus', { operationId });
+
+    if (!status.done) return { status: 'RUNNING' as const };
+    if (!status.videoUrl) return { status: 'FAILED' as const };
+
+    return {
+        status: 'READY' as const,
+        videoUrl: await fetchGeneratedVideo(status.videoUrl),
+    };
 };
 
 export const generateSpeech = async (text: string) => {
@@ -124,34 +127,29 @@ export const analyzeVideo = async (
 
 // Live API receives a short-lived server-issued token, never the provider key.
 export const getLiveClient = async () => {
-    const response = await fetch('/api/live-token', {
+    const response = await authenticatedFetch('/api/live-token', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            ...await authenticatedHeaders(),
         },
     });
 
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || typeof data.token !== 'string') {
-        throw new Error(typeof data.error === 'string' ? data.error : 'Live authentication failed.');
+    const data = await parseApiResponse<{ token?: unknown }>(
+        response,
+        'Live authentication failed.'
+    );
+    if (typeof data.token !== 'string') {
+        throw normalizeError(new Error('Live authentication failed.'), 502);
     }
 
     return new GoogleGenAI({ apiKey: data.token });
 };
 
 export const fetchGeneratedVideo = async (videoUrl: string) => {
-    const response = await fetch(videoUrl, {
-        headers: await authenticatedHeaders(),
-    });
+    const response = await authenticatedFetch(videoUrl);
 
     if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(
-            typeof data.error === 'string'
-                ? data.error
-                : 'Unable to download generated video.'
-        );
+        await parseApiResponse(response, 'Unable to download generated video.');
     }
 
     return URL.createObjectURL(await response.blob());

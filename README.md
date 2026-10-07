@@ -43,6 +43,7 @@ La credencial persistente `GEMINI_API_KEY` **no se inyecta en el bundle del nave
 - `api/gemini.js` centraliza las operaciones de IA.
 - `api/live-token.js` entrega tokens efímeros para Live.
 - `api/video.js` sirve el resultado de Veo sin entregar la clave al cliente.
+- `api/feedback.js` persiste estado y valoración de video sin prompts ni contenido generado.
 - Los endpoints validan el JWT Supabase y consumen importes de crédito fijados en servidor.
 - Los fallos del proveedor activan un reembolso mediante una credencial Supabase server-only.
 - El proxy de video requiere sesión autenticada y solo acepta rutas de archivos generados en el host de Google.
@@ -104,6 +105,9 @@ pnpm preview
 src/App.tsx
 src/main.tsx
 src/components/
+src/domain/
+src/feedback/
+src/hooks/
 src/services/
 src/core/
 api/
@@ -132,7 +136,12 @@ api/live-token.js
 
 api/video.js
   └─ proxy seguro del resultado Veo
+
+api/feedback.js
+  └─ captura autenticada de metadatos operacionales y rating
 ```
+
+La migración `20261007080000_operation_feedback.sql` crea el registro de feedback y la vista diaria `operation_feedback_daily_metrics` (tasas de éxito/fallo/timeout/reintento y latencia media/p95). El acceso a la tabla y a la vista queda restringido a `service_role`; aplicar la migración antes de desplegar `/api/feedback.js`.
 
 ## Principios de producto
 

@@ -1,7 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { generateImage, generateVideo, generateSpeech, analyzeVideo } from '../services/geminiService';
+import {
+    generateImage,
+    generateVideo,
+    verifyVideoStatus,
+    generateSpeech,
+    analyzeVideo,
+} from '../services/geminiService';
 import { MediaType } from '../types';
 import { Video, Image as ImageIcon, Mic, Film } from 'lucide-react';
+import { normalizeError } from '../domain/errors';
+import { useOperation } from '../hooks/useOperation';
+import { submitFeedback } from '../feedback/feedbackService';
+import type { FeedbackEvent } from '../feedback/feedback.types';
 
 const MAX_VIDEO_BYTES = 3_000_000;
 
@@ -22,8 +32,16 @@ const MediaStudio: React.FC = () => {
     const [activeTab, setActiveTab] = useState<MediaType>(MediaType.VIDEO_GEN);
     const [prompt, setPrompt] = useState('');
     const [loading, setLoading] = useState(false);
+    const [verifyingVideo, setVerifyingVideo] = useState(false);
+    const videoOperation = useOperation<string>();
+    const videoOperationBusy = ['VALIDATING', 'STARTING', 'RUNNING', 'POLLING']
+        .includes(videoOperation.state.status);
     const [output, setOutput] = useState<string | null>(null);
     const [status, setStatus] = useState('');
+    const [feedbackEvent, setFeedbackEvent] = useState<FeedbackEvent | null>(null);
+    const [feedbackSaving, setFeedbackSaving] = useState(false);
+    const [feedbackMessage, setFeedbackMessage] = useState('');
+    const isBusy = loading || videoOperationBusy || verifyingVideo || feedbackSaving;
 
     const [aspectRatio, setAspectRatio] = useState<string>('16:9');
     const [imageSize, setImageSize] = useState<'1K'|'2K'|'4K'>('1K');
@@ -33,6 +51,8 @@ const MediaStudio: React.FC = () => {
     useEffect(() => {
         setStatus('');
         setOutput(null);
+        setFeedbackEvent(null);
+        setFeedbackMessage('');
     }, [activeTab]);
 
     useEffect(() => {
@@ -46,20 +66,127 @@ const MediaStudio: React.FC = () => {
         if (output?.startsWith('blob:')) URL.revokeObjectURL(output);
     }, [output]);
 
-    const handleGenerate = async () => {
-        if (loading) return;
+    const saveFeedback = async (event: FeedbackEvent) => {
+        setFeedbackEvent(event);
+        setFeedbackSaving(true);
+        try {
+            await submitFeedback(event);
+            setFeedbackMessage(event.rating === undefined
+                ? 'OPERATION FEEDBACK RECORDED.'
+                : 'YOUR RATING HAS BEEN RECORDED.');
+        } catch (error) {
+            console.error('Unable to record operation feedback.', error);
+            setFeedbackMessage(`FEEDBACK NOT RECORDED: ${normalizeError(error).message}`);
+        } finally {
+            setFeedbackSaving(false);
+        }
+    };
 
-        setLoading(true);
+    const verifyTimedOutVideo = async () => {
+        const { operationId, requestId, startedAt } = videoOperation.state;
+        if (!operationId || !requestId || startedAt === undefined) return;
+
+        setVerifyingVideo(true);
+        setFeedbackMessage('');
+        setStatus('VERIFYING PROVIDER STATUS...');
+        try {
+            const result = await verifyVideoStatus(operationId);
+            if (result.status === 'RUNNING') {
+                setStatus('STILL PROCESSING. VERIFY AGAIN LATER; THE PROVIDER OPERATION WAS NOT CANCELLED.');
+                return;
+            }
+
+            const retry = videoOperation.state.retry;
+            const event: FeedbackEvent = {
+                requestId,
+                operationId,
+                feature: 'media',
+                action: 'video.generate',
+                status: result.status,
+                durationMs: Date.now() - startedAt,
+                model: 'veo-3.1-generate-preview',
+                ...(result.status === 'FAILED' ? { errorCode: 'PROVIDER_ERROR' as const } : {}),
+                retry,
+            };
+            if (result.status === 'READY') {
+                videoOperation.settleTimedOut({
+                    status: 'READY',
+                    result: result.videoUrl,
+                });
+                setOutput(result.videoUrl);
+                setStatus('VIDEO GENERATION CONFIRMED COMPLETE.');
+            } else {
+                const error = normalizeError(
+                    new Error('The provider reported that video generation failed.'),
+                    502
+                );
+                videoOperation.settleTimedOut({ status: 'FAILED', error });
+                setStatus('THE PROVIDER REPORTED THAT VIDEO GENERATION FAILED.');
+            }
+            await saveFeedback(event);
+        } catch (error) {
+            setStatus(normalizeError(error).message);
+        } finally {
+            setVerifyingVideo(false);
+        }
+    };
+
+    const handleGenerate = async (isRetry = false) => {
+        if (isBusy) return;
+
+        const isVideoOperation = activeTab === MediaType.VIDEO_GEN;
+        let requestId: string | undefined;
+        let operationId: string | undefined;
+        let startedAt: number | undefined;
+        if (!isVideoOperation) setLoading(true);
         setOutput(null);
         setStatus('INITIALIZING...');
+        if (isVideoOperation) {
+            setFeedbackEvent(null);
+            setFeedbackMessage('');
+        }
 
         try {
             if (activeTab === MediaType.VIDEO_GEN) {
                 const ratio = aspectRatio === '9:16' ? '9:16' : '16:9';
                 setStatus('WARMING UP VEO-3.1...');
-                const videoUrl = await generateVideo(prompt, ratio);
+                const videoUrl = await videoOperation.run(({
+                    requestId: currentRequestId,
+                    startedAt: operationStartedAt,
+                    setStatus: setOperationStatus,
+                    setOperationId,
+                    setAttempt,
+                }) => {
+                    requestId = currentRequestId;
+                    startedAt = operationStartedAt;
+                    setOperationStatus('RUNNING');
+                    return generateVideo(prompt, ratio, undefined, {
+                        onOperationId: id => {
+                            operationId = id;
+                            setOperationId(id);
+                        },
+                        onPolling: attempt => {
+                            setOperationStatus('POLLING');
+                            setAttempt(attempt);
+                        },
+                    });
+                }, isRetry);
+                if (videoUrl === undefined) return;
                 setOutput(videoUrl);
                 setStatus('RENDER COMPLETE.');
+                if (requestId && startedAt !== undefined) {
+                    const event: FeedbackEvent = {
+                        requestId,
+                        operationId,
+                        feature: 'media',
+                        action: 'video.generate',
+                        status: 'READY',
+                        durationMs: Date.now() - startedAt,
+                        model: 'veo-3.1-generate-preview',
+                        retry: isRetry,
+                    };
+                    await saveFeedback(event);
+                }
             }
             else if (activeTab === MediaType.IMAGE_GEN) {
                 setStatus('CONFIGURING NANO BANANA 2...');
@@ -119,11 +246,26 @@ const MediaStudio: React.FC = () => {
                 setOutput(analysis ?? 'NO ANALYSIS RETURNED.');
                 setStatus('ANALYSIS COMPLETE.');
             }
-        } catch (e: any) {
+        } catch (e) {
             console.error(e);
-            setStatus(`ERROR: ${e?.message || 'Request failed.'}`);
+            const error = normalizeError(e);
+            setStatus(error.message);
+            if (isVideoOperation && requestId && startedAt !== undefined) {
+                const event: FeedbackEvent = {
+                    requestId,
+                    operationId,
+                    feature: 'media',
+                    action: 'video.generate',
+                    status: error.code === 'TIMEOUT' ? 'TIMEOUT' : 'FAILED',
+                    durationMs: Date.now() - startedAt,
+                    model: 'veo-3.1-generate-preview',
+                    errorCode: error.code,
+                    retry: isRetry,
+                };
+                await saveFeedback(event);
+            }
         } finally {
-            setLoading(false);
+            if (!isVideoOperation) setLoading(false);
         }
     };
 
@@ -221,16 +363,84 @@ const MediaStudio: React.FC = () => {
 
                 <button
                     type="button"
-                    onClick={handleGenerate}
-                    disabled={loading}
+                    onClick={() => void handleGenerate()}
+                    disabled={isBusy}
                     className="w-full py-3 bg-neon-red/10 border border-neon-red hover:bg-neon-red hover:text-black transition-all font-bold tracking-widest"
                 >
-                    {loading ? 'PROCESSING...' : 'EXECUTE'}
+                    {isBusy ? 'PROCESSING...' : 'EXECUTE'}
                 </button>
 
                 <div className="font-mono text-xs text-neon-red/70 border-t border-dashed border-neon-red/30 pt-2">
                     {'>'} SYSTEM_LOG: {status}
                 </div>
+                {feedbackEvent && (feedbackSaving || feedbackMessage) && (
+                    <div className="text-xs text-neon-red/70" aria-live="polite">
+                        {feedbackSaving ? 'SAVING FEEDBACK...' : feedbackMessage}
+                    </div>
+                )}
+
+                {activeTab === MediaType.VIDEO_GEN
+                    && videoOperation.state.status === 'TIMEOUT'
+                    && feedbackEvent?.status === 'TIMEOUT'
+                    && videoOperation.state.operationId && (
+                    <div className="border border-yellow-500/50 bg-yellow-950/20 p-3 text-xs text-yellow-200" aria-live="polite">
+                        <p className="font-bold">The request was accepted, but completion is not confirmed.</p>
+                        <p className="mt-1">The client timeout did not cancel the provider operation.</p>
+                        <div className="flex gap-2 mt-3">
+                            <button
+                                type="button"
+                                onClick={() => void verifyTimedOutVideo()}
+                                disabled={isBusy}
+                                className="border border-yellow-400 px-3 py-1 hover:bg-yellow-400 hover:text-black disabled:opacity-50"
+                            >
+                                VERIFY STATUS
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => void handleGenerate(true)}
+                                disabled={isBusy}
+                                className="border border-yellow-400/50 px-3 py-1 hover:bg-yellow-400/20 disabled:opacity-50"
+                            >
+                                START NEW GENERATION
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === MediaType.VIDEO_GEN && feedbackEvent?.status === 'FAILED' && (
+                    <div className="border border-neon-red/40 bg-red-950/20 p-3 text-xs" aria-live="polite">
+                        <p>The video operation failed. No completed video was confirmed.</p>
+                        <button
+                            type="button"
+                            onClick={() => void handleGenerate(true)}
+                            disabled={isBusy}
+                            className="mt-3 border border-neon-red px-3 py-1 hover:bg-neon-red hover:text-black disabled:opacity-50"
+                        >
+                            TRY AGAIN
+                        </button>
+                    </div>
+                )}
+
+                {activeTab === MediaType.VIDEO_GEN && feedbackEvent?.status === 'READY' && (
+                    <div className="border border-neon-red/30 p-3 text-xs" aria-live="polite">
+                        <p>How useful was this result? Rate it from 1 to 5.</p>
+                        <div className="flex gap-2 mt-2">
+                            {[1, 2, 3, 4, 5].map(rating => (
+                                <button
+                                    key={rating}
+                                    type="button"
+                                    aria-label={`Rate result ${rating} out of 5`}
+                                    aria-pressed={feedbackEvent.rating === rating}
+                                    onClick={() => void saveFeedback({ ...feedbackEvent, rating })}
+                                    disabled={feedbackSaving}
+                                    className={`border px-3 py-1 disabled:opacity-50 ${feedbackEvent.rating === rating ? 'bg-neon-red text-black' : 'border-neon-red/50 hover:bg-neon-red/20'}`}
+                                >
+                                    {rating}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {output && (
                     <div className="flex-1 bg-black/50 border border-neon-red/30 flex items-center justify-center p-2 min-h-[200px] relative overflow-hidden">

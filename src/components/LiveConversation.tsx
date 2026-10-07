@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { getLiveClient } from '../services/geminiService';
+import { normalizeError } from '../domain/errors';
 import { Modality } from "@google/genai";
 import { Mic, MicOff, Volume2 } from 'lucide-react';
 
@@ -162,9 +163,9 @@ const LiveConversation: React.FC = () => {
             });
 
             sessionRef.current = session;
-        } catch (e: any) {
+        } catch (e) {
             disconnect();
-            log("FAILED TO CONNECT: " + (e?.message || "Unknown error."));
+            log("FAILED TO CONNECT: " + normalizeError(e).message);
         }
     };
 
