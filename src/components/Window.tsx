@@ -24,7 +24,7 @@ const Window: React.FC<WindowProps> = ({
   const windowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       if (!isDragging) return;
       setPosition({
         x: e.clientX - dragOffset.current.x,
@@ -32,22 +32,25 @@ const Window: React.FC<WindowProps> = ({
       });
     };
 
-    const handleMouseUp = () => {
+    const handlePointerUp = () => {
       setIsDragging(false);
     };
 
     if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('pointermove', handlePointerMove);
+      document.addEventListener('pointerup', handlePointerUp);
+      document.addEventListener('pointercancel', handlePointerUp);
     }
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
+      document.removeEventListener('pointercancel', handlePointerUp);
     };
   }, [isDragging]);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.target instanceof Element && e.target.closest('button')) return;
     onFocus();
     if (windowRef.current) {
         const rect = windowRef.current.getBoundingClientRect();
@@ -86,16 +89,28 @@ const Window: React.FC<WindowProps> = ({
       onMouseDown={onFocus}
     >
       <div
-        className={`flex items-center justify-between px-3 py-2 border-b border-white/20 cursor-grab active:cursor-grabbing bg-gradient-to-r ${theme.bg} to-transparent`}
-        onMouseDown={handleMouseDown}
+        className={`flex touch-none items-center justify-between px-3 py-2 border-b border-white/20 cursor-grab active:cursor-grabbing bg-gradient-to-r ${theme.bg} to-transparent`}
+        onPointerDown={handlePointerDown}
       >
         <div className={`flex items-center gap-2 font-mono font-bold ${theme.text} text-shadow`}>
           {icon}
           <span className="tracking-wider">{title}</span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={(e) => { e.stopPropagation(); onMinimize(); }} className="w-3 h-3 rounded-full bg-yellow-400 hover:bg-yellow-300 shadow-md" />
-          <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-400 shadow-md" />
+          <button
+            type="button"
+            aria-label={`Minimize ${title}`}
+            title={`Minimize ${title}`}
+            onClick={(e) => { e.stopPropagation(); onMinimize(); }}
+            className="w-6 h-6 sm:w-3 sm:h-3 rounded-full bg-yellow-400 hover:bg-yellow-300 shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+          />
+          <button
+            type="button"
+            aria-label={`Close ${title}`}
+            title={`Close ${title}`}
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
+            className="w-6 h-6 sm:w-3 sm:h-3 rounded-full bg-red-500 hover:bg-red-400 shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+          />
         </div>
       </div>
       <div className="flex-1 overflow-auto p-4 text-white font-rajdhani">

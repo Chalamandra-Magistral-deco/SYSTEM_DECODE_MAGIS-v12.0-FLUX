@@ -46,6 +46,7 @@ La credencial persistente `GEMINI_API_KEY` **no se inyecta en el bundle del nave
 - `api/feedback.js` persiste estado y valoración de video sin prompts ni contenido generado.
 - Los endpoints validan el JWT Supabase y consumen importes de crédito fijados en servidor.
 - Los fallos del proveedor activan un reembolso mediante una credencial Supabase server-only.
+- Si la aceptación de Veo o su persistencia no puede confirmarse, la operación queda pendiente y no se reembolsa automáticamente; el identificador se devuelve para conciliación manual. Un fallo terminal confirmado se marca `failed` y el reembolso es idempotente.
 - El proxy de video requiere sesión autenticada y solo acepta rutas de archivos generados en el host de Google.
 - El comando `login [key]` fue eliminado; las claves ya no se guardan en `localStorage`.
 - Hay límites de frecuencia por instancia y validación básica; no sustituyen límites distribuidos ni controles avanzados de abuso.

@@ -302,7 +302,7 @@ const App: React.FC = () => {
             </div>
 
             {/* Dock */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-6 z-50">
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex max-w-[calc(100vw-1rem)] gap-2 overflow-x-auto p-1 z-50 sm:bottom-8 sm:gap-6">
                  <DesktopIcon label="MATRIX" icon={<Radar />} colorClass="border-neon-gold shadow-neon-gold text-neon-gold" onClick={() => toggleWindow('matrix')} />
                  <DesktopIcon label="DEPLOY" icon={<Cpu />} colorClass="border-neon-green shadow-neon-green text-neon-green" onClick={() => toggleWindow('cicd')} />
                  <DesktopIcon label="STUDIO" icon={<Video />} colorClass="border-neon-red shadow-neon-red text-neon-red" onClick={() => toggleWindow('media')} />

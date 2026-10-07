@@ -30,6 +30,12 @@ export const useMatrixDecode = (
       return;
     }
 
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setDisplayText(targetText);
+      setIsDecrypting(false);
+      return;
+    }
+
     let cancelled = false;
     let step = 0;
     const totalSteps = 24;
@@ -97,6 +103,7 @@ export const MatrixDecoder: React.FC = () => {
   });
 
   const [targetCode, setTargetCode] = useState('');
+  const [dateError, setDateError] = useState('');
 
   const { displayText, isDecrypting } =
     useMatrixDecode(targetCode, 35);
@@ -106,17 +113,31 @@ export const MatrixDecoder: React.FC = () => {
   ) => {
     event.preventDefault();
 
-    const day = Number.parseInt(birthDate.day, 10);
-    const month = Number.parseInt(birthDate.month, 10);
-    const year = Number.parseInt(birthDate.year, 10);
+    const day = Number(birthDate.day);
+    const month = Number(birthDate.month);
+    const year = Number(birthDate.year);
+    const code = calculateMatrixCode(day, month, year);
 
-    setTargetCode(
-      calculateMatrixCode(day, month, year),
-    );
+    if (!code) {
+      setDateError('Introduce una fecha válida del calendario.');
+      return;
+    }
+
+    setDateError('');
+    setTargetCode(code);
+  };
+
+  const updateDatePart = (
+    part: keyof typeof birthDate,
+    value: string,
+  ) => {
+    setBirthDate(current => ({ ...current, [part]: value }));
+    setDateError('');
+    setTargetCode('');
   };
 
   return (
-    <div className="w-full max-w-md p-6 bg-slate-950 border border-emerald-500/30 rounded-xl shadow-2xl font-mono text-emerald-400 select-none">
+    <div className="w-full max-w-md p-6 bg-slate-950 border border-emerald-500/30 rounded-xl shadow-2xl font-mono text-emerald-400">
       <header className="mb-6 pb-3 border-b border-emerald-500/20 text-center">
         <h2 className="text-lg font-bold tracking-wider uppercase text-emerald-300">
           [ Matrix Decoder ]
@@ -130,65 +151,74 @@ export const MatrixDecoder: React.FC = () => {
       <form onSubmit={handleCalculate} className="space-y-4">
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="block text-[10px] text-emerald-600 mb-1 tracking-wider uppercase">
+            <label htmlFor="matrix-day" className="block text-[10px] text-emerald-600 mb-1 tracking-wider uppercase">
               DÍA
             </label>
             <input
+              id="matrix-day"
               type="number"
               min="1"
               max="31"
+              step="1"
               required
               value={birthDate.day}
               onChange={(e) =>
-                setBirthDate({
-                  ...birthDate,
-                  day: e.target.value,
-                })
+                updateDatePart('day', e.target.value)
               }
+              aria-invalid={Boolean(dateError)}
+              aria-describedby={dateError ? 'matrix-date-error' : undefined}
               className="w-full bg-slate-900 border border-emerald-500/40 rounded px-3 py-2 text-center text-emerald-200 placeholder-emerald-800 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
             />
           </div>
 
           <div>
-            <label className="block text-[10px] text-emerald-600 mb-1 tracking-wider uppercase">
+            <label htmlFor="matrix-month" className="block text-[10px] text-emerald-600 mb-1 tracking-wider uppercase">
               MES
             </label>
             <input
+              id="matrix-month"
               type="number"
               min="1"
               max="12"
+              step="1"
               required
               value={birthDate.month}
               onChange={(e) =>
-                setBirthDate({
-                  ...birthDate,
-                  month: e.target.value,
-                })
+                updateDatePart('month', e.target.value)
               }
+              aria-invalid={Boolean(dateError)}
+              aria-describedby={dateError ? 'matrix-date-error' : undefined}
               className="w-full bg-slate-900 border border-emerald-500/40 rounded px-3 py-2 text-center text-emerald-200 placeholder-emerald-800 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
             />
           </div>
 
           <div>
-            <label className="block text-[10px] text-emerald-600 mb-1 tracking-wider uppercase">
+            <label htmlFor="matrix-year" className="block text-[10px] text-emerald-600 mb-1 tracking-wider uppercase">
               AÑO
             </label>
             <input
+              id="matrix-year"
               type="number"
               min="1900"
               max="2099"
+              step="1"
               required
               value={birthDate.year}
               onChange={(e) =>
-                setBirthDate({
-                  ...birthDate,
-                  year: e.target.value,
-                })
+                updateDatePart('year', e.target.value)
               }
+              aria-invalid={Boolean(dateError)}
+              aria-describedby={dateError ? 'matrix-date-error' : undefined}
               className="w-full bg-slate-900 border border-emerald-500/40 rounded px-3 py-2 text-center text-emerald-200 placeholder-emerald-800 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
             />
           </div>
         </div>
+
+        {dateError && (
+          <p id="matrix-date-error" role="alert" className="text-xs text-red-300">
+            {dateError}
+          </p>
+        )}
 
         <button
           type="submit"
@@ -203,10 +233,10 @@ export const MatrixDecoder: React.FC = () => {
 
       {targetCode && (
         <div className="mt-6 pt-4 border-t border-emerald-500/20 text-center">
-          <span className="text-[10px] text-emerald-500 uppercase tracking-widest block mb-2">
+          <span role="status" aria-live="polite" className="text-[10px] text-emerald-500 uppercase tracking-widest block mb-2">
             {isDecrypting
-              ? '▶ DESENCRIPTANDO VECTOR'
-              : '✔ CÓDIGO EXTRAÍDO'}
+              ? '▶ DECODIFICANDO CÓDIGO'
+              : `✔ CÓDIGO EXTRAÍDO: ${targetCode}`}
           </span>
 
           <div
@@ -217,6 +247,7 @@ export const MatrixDecoder: React.FC = () => {
                 ? 'border-emerald-400 text-emerald-400'
                 : 'border-emerald-500/60 text-emerald-300',
             ].join(' ')}
+            aria-hidden="true"
           >
             {displayText}
           </div>

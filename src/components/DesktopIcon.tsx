@@ -13,10 +13,10 @@ const DesktopIcon: React.FC<DesktopIconProps> = ({ label, icon, colorClass, onCl
       type="button"
       aria-label={'Open ' + label}
       title={label}
-      className={'group relative w-20 h-20 bg-gray-900/90 border-2 rounded-xl flex items-center justify-center cursor-pointer transition-all duration-300 hover:-translate-y-4 hover:scale-110 hover:bg-gray-800 z-10 ' + colorClass}
+      className={'group relative h-12 w-12 shrink-0 bg-gray-900/90 border-2 rounded-xl flex items-center justify-center cursor-pointer transition-all duration-300 hover:-translate-y-4 hover:scale-110 hover:bg-gray-800 z-10 sm:h-20 sm:w-20 ' + colorClass}
       onClick={onClick}
     >
-      <div className="text-4xl filter drop-shadow-lg transition-transform duration-300 group-hover:scale-110" aria-hidden="true">
+      <div className="text-2xl filter drop-shadow-lg transition-transform duration-300 group-hover:scale-110 sm:text-4xl" aria-hidden="true">
         {icon}
       </div>
       <div

@@ -199,8 +199,9 @@ async function handleVideoStart(ai, payload, userId, operationId) {
 
   await createVideoOperation(userId, operationId);
 
+  let operation;
   try {
-    const operation = await ai.models.generateVideos({
+    operation = await ai.models.generateVideos({
       model: "veo-3.1-generate-preview",
       prompt,
       config: {
@@ -209,31 +210,66 @@ async function handleVideoStart(ai, payload, userId, operationId) {
         aspectRatio,
       },
     });
-
-    if (!operation?.name) {
-      throw new Error("Video generation did not return an operation id.");
+  } catch (error) {
+    const providerStatus = Number(error?.status ?? error?.statusCode);
+    if (providerStatus >= 400 && providerStatus < 500 && providerStatus !== 408) {
+      await failVideoOperation(userId, operationId);
+      throw error;
     }
 
+    console.error("MAGIS_VIDEO_START_RECONCILIATION_REQUIRED", {
+      operationId,
+      userId,
+      providerStatus: Number.isFinite(providerStatus) ? providerStatus : null,
+    });
+    const reconciliationError = new Error(
+      "Video start status is uncertain; provider execution may still be running.",
+      { cause: error },
+    );
+    reconciliationError.statusCode = 503;
+    reconciliationError.reconciliationRequired = true;
+    reconciliationError.operationId = operationId;
+    throw reconciliationError;
+  }
+
+  if (typeof operation?.name !== "string" || !operation.name.trim()) {
+    console.error("MAGIS_VIDEO_START_RECONCILIATION_REQUIRED", {
+      operationId,
+      userId,
+      providerStatus: null,
+    });
+    const reconciliationError = new Error(
+      "Video start status is uncertain; provider execution may still be running.",
+    );
+    reconciliationError.statusCode = 503;
+    reconciliationError.reconciliationRequired = true;
+    reconciliationError.operationId = operationId;
+    throw reconciliationError;
+  }
+
+  try {
     await bindVideoProviderOperation(
       userId,
       operationId,
       operation.name,
     );
-
-    return { operationId };
   } catch (error) {
-    try {
-      await failVideoOperation(userId, operationId);
-    } catch (recordError) {
-      console.error("MAGIS_VIDEO_OPERATION_RECORD_ERROR", {
-        operationId,
-        userId,
-        error: recordError?.message,
-      });
-    }
-
-    throw error;
+    console.error("MAGIS_VIDEO_BIND_RECONCILIATION_REQUIRED", {
+      operationId,
+      userId,
+      providerOperationName: operation.name,
+    });
+    const reconciliationError = new Error(
+      "The provider accepted the video operation, but tracking could not be confirmed.",
+      { cause: error },
+    );
+    reconciliationError.statusCode = 503;
+    reconciliationError.reconciliationRequired = true;
+    reconciliationError.operationId = operationId;
+    throw reconciliationError;
   }
+
+  return { operationId };
 }
 
 async function handleVideoStatus(ai, payload, userId) {
@@ -262,6 +298,7 @@ async function handleVideoStatus(ai, payload, userId) {
   }
 
   if (owned.status === "failed") {
+    await refundCredits(userId, operationId, "video_provider_failed");
     return {
       done: true,
       videoUrl: null,
@@ -294,6 +331,15 @@ async function handleVideoStatus(ai, payload, userId) {
     return {
       done: true,
       videoUrl: `/api/video?operationId=${encodeURIComponent(operationId)}`,
+    };
+  }
+
+  if (operation?.done) {
+    await failVideoOperation(userId, operationId);
+    await refundCredits(userId, operationId, "video_provider_failed");
+    return {
+      done: true,
+      videoUrl: null,
     };
   }
 
@@ -401,7 +447,7 @@ export default async function handler(req, res) {
 
     return sendJson(res, 200, result);
   } catch (error) {
-    if (charged) {
+    if (charged && error?.reconciliationRequired !== true) {
       try {
         await refundCredits(user.id, operationId, "ai_execution_failed");
       } catch (refundError) {
@@ -414,6 +460,14 @@ export default async function handler(req, res) {
           error: "The AI request failed and its credit refund could not be confirmed. Contact support.",
         });
       }
+    }
+
+    if (error?.reconciliationRequired === true) {
+      return sendJson(res, 503, {
+        error: `Video operation status is uncertain; credits remain reserved. Contact support with operation ID ${error.operationId}.`,
+        operationId: error.operationId,
+        reconciliationRequired: true,
+      });
     }
 
     const status = Number(error?.statusCode) || 502;
