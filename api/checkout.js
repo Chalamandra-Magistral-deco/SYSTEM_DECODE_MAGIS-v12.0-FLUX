@@ -126,7 +126,6 @@ export default async function handler(req, res) {
     form.set("line_items[0][quantity]", "1");
     form.set("client_reference_id", user.id);
     form.set("customer_email", user.email || "");
-    form.set("allow_promotion_codes", "true");
     form.set("success_url", successUrl.toString());
     form.set("cancel_url", cancelUrl.toString());
     form.set("metadata[user_id]", user.id);
