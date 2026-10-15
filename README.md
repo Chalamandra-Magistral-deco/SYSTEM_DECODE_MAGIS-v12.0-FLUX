@@ -1,99 +1,34 @@
 # SYSTEM_DECODE_MAGIS // v12.0 FLUX
 
-**MAGIS** es el workspace multimodal de Chalamandra Magistral: análisis, búsqueda, generación de imagen/video, voz y conversación Live dentro de una interfaz cyberpunk operativa.
+**MAGIS** es un espacio de trabajo multimodal de Chalamandra Magistral. Reúne herramientas de análisis, búsqueda con fuentes, generación de imagen y video, síntesis de voz y conversación de voz en tiempo real en una interfaz de escritorio interactiva.
 
-## Estado
+La aplicación combina una SPA en React y TypeScript con funciones serverless en Vercel. Supabase gestiona autenticación, perfiles y créditos; las funciones de servidor conectan los módulos con Gemini, Veo y, opcionalmente, Stripe. Las credenciales privadas permanecen en el servidor.
 
-La aplicación funciona como una SPA React/Vite desplegada en Vercel. El acceso a módulos de IA requiere una sesión Supabase; el gateway valida el usuario y descuenta créditos antes de iniciar cada operación cobrada.
+## Qué puedes hacer
 
-### Flujo de producción
+| Módulo | Uso |
+| --- | --- |
+| **Matrix Analyzer** | Explorar una pregunta y generar análisis estratégico |
+| **Matrix Decoder** | Calcular el código Matrix a partir de una fecha |
+| **Deployment Analyzer** | Analizar decisiones técnicas y riesgos |
+| **Terminal** | Consultar Gemini y realizar búsquedas con grounding |
+| **Media Studio** | Generar imágenes, videos y voz; analizar videos |
+| **Neural Link** | Iniciar una conversación de voz en tiempo real |
+| **Billing** | Consultar la parte comercial y adquirir créditos cuando Stripe está configurado |
 
-```text
-OPERADOR
-   ↓
-MAGIS UI (React + TypeScript)
-   ↓
-MAGIS API (Vercel Functions)
-   ↓
-Gemini / Veo / Image / TTS / Live
-   ↓
-RESULTADO
-```
+El acceso a los módulos requiere una sesión Supabase válida y una cuenta activa. Las operaciones de IA que consumen créditos se autorizan y cobran en el servidor.
 
-El objetivo comercial es que MAGIS sea un producto utilizable y medible, no solo una demo visual.
+## Tecnologías
 
-## Módulos
+- **Interfaz:** React 19, TypeScript, Vite 6.
+- **Estilos:** Tailwind CSS 4 y CSS global en `src/styles.css`.
+- **Autenticación y datos:** Supabase Auth, Supabase JS y migraciones SQL.
+- **IA:** Google GenAI SDK y API de Gemini/Veo a través de funciones server-side.
+- **Pagos opcionales:** Stripe Checkout y webhook firmado.
+- **Pruebas:** Vitest.
+- **Despliegue:** Vercel.
 
-| Módulo | Función | Modelo / servicio |
-| :--- | :--- | :--- |
-| **Matrix Analyzer** | Análisis estratégico y plan de acción | Gemini 2.5 Flash-Lite |
-| **Deployment Analyzer** | Evaluación técnica y de riesgo | Gemini 3.8 Flash |
-| **Media Studio** | Imagen, video, voz y análisis de video | Gemini 3.1 Flash Image, Veo 3.1, Gemini 3.8 Flash TTS, Gemini 3.8 Flash |
-| **Neural Link** | Conversación de voz en tiempo real | Gemini 3.8 Live |
-| **Terminal** | Comandos de IA y búsqueda con grounding | Gemini 2.5 Flash-Lite / Flash |
-| **System Specs** | Información del sistema | N/A |
-
-Los modelos se mantienen separados por capacidad para controlar latencia, coste y calidad.
-
-## Seguridad
-
-La credencial persistente `GEMINI_API_KEY` **no se inyecta en el bundle del navegador**.
-
-- `services/geminiService.ts` llama a funciones `/api/*`.
-- `api/gemini.js` centraliza las operaciones de IA.
-- `api/live-token.js` entrega tokens efímeros para Live.
-- `api/video.js` sirve el resultado de Veo sin entregar la clave al cliente.
-- `api/feedback.js` persiste estado y valoración de video sin prompts ni contenido generado.
-- Los endpoints validan el JWT Supabase y consumen importes de crédito fijados en servidor.
-- Los fallos del proveedor activan un reembolso mediante una credencial Supabase server-only.
-- Si la aceptación de Veo o su persistencia no puede confirmarse, la operación queda pendiente y no se reembolsa automáticamente; el identificador se devuelve para conciliación manual. Un fallo terminal confirmado se marca `failed` y el reembolso es idempotente.
-- El proxy de video requiere sesión autenticada y solo acepta rutas de archivos generados en el host de Google.
-- El comando `login [key]` fue eliminado; las claves ya no se guardan en `localStorage`.
-- Hay límites de frecuencia por instancia y validación básica; no sustituyen límites distribuidos ni controles avanzados de abuso.
-
-### Deuda técnica de producción
-
-- `api/video.js` materializa el video upstream completo en memoria antes de responder. Migrar a streaming con backpressure/range requiere una validación aparte; el buffer puede elevar el uso de memoria con archivos grandes.
-- La conciliación de una aceptación de proveedor incierta requiere revisión manual con el identificador de operación; no existe un reconciliador automático.
-
-### Configuración de entorno
-
-Variables del cliente (solo URL y clave publicable; se incorporan al bundle):
-
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
-
-Variables server-side en Vercel:
-
-- `GEMINI_API_KEY`
-- `SUPABASE_URL`
-- `SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_SECRET_KEY` — exclusivamente server-side; `SUPABASE_SERVICE_ROLE_KEY` queda como fallback legacy temporal.
-- `STRIPE_SECRET_KEY` — exclusivamente server-side.
-- `STRIPE_PRICE_STARTER` y `STRIPE_PRICE_PRO` — Price IDs de Stripe para los packs de créditos.
-- `STRIPE_WEBHOOK_SECRET` — exclusivamente server-side.
-- `MAGIS_APP_URL` — URL canónica de producción.
-
-Aplicar las migraciones de `supabase/migrations/` al proyecto Supabase real. Configurar Auth, dominios de redirección, correo y CSP para el dominio de producción. La CSP incluida permite dominios `*.supabase.co`; los dominios Supabase personalizados requieren actualizarla.
-
-### Tarifas provisionales
-
-El importe lo determina el servidor; el cliente no puede elegir ni reducir el débito:
-
-| Operación | Créditos |
-| --- | ---: |
-| Texto | 1 |
-| Razonamiento | 3 |
-| Búsqueda | 1 |
-| Imagen | 25 |
-| Voz TTS | 5 |
-| Inicio de generación de video | 50 |
-| Análisis de video | 3 |
-| Inicio de sesión Live | 5 |
-
-Son valores provisionales aprobados para esta implementación, todavía no contrastados con costes reales del proveedor. Consultar estado de video no vuelve a cobrar. MAGIS incorpora checkout de packs de créditos y acreditación server-side idempotente; activar pagos requiere configurar Stripe Products/Prices, sus variables de entorno y el webhook de producción.
-
-## Desarrollo
+## Empezar en local
 
 Requisitos: Node.js y pnpm.
 
@@ -102,96 +37,133 @@ pnpm install
 pnpm dev
 ```
 
-Build de producción:
+Vite inicia la interfaz en `http://localhost:3000`. Para ejecutar la aplicación conectada, configura las variables de Supabase del cliente y las variables de servidor en Vercel. El servidor de Vite no emula las funciones `api/`; por tanto, las rutas `/api/*` necesitan un entorno Vercel para probar el flujo completo.
+
+### Comandos
+
+| Comando | Descripción |
+| --- | --- |
+| `pnpm dev` | Inicia el servidor Vite de desarrollo |
+| `pnpm build` | Genera el build de producción en `dist/` |
+| `pnpm preview` | Sirve localmente el build generado |
+| `pnpm test` | Ejecuta las pruebas con Vitest |
+
+## Configuración
+
+Configura las variables en Vercel o en el entorno que corresponda. No añadas secretos a Git ni a variables `VITE_*`: Vite las incorpora al bundle del navegador.
+
+| Variable | Dónde | Necesidad |
+| --- | --- | --- |
+| `VITE_SUPABASE_URL` | Build del cliente | Necesaria para conectar el navegador con Supabase |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Build del cliente | Necesaria para autenticación desde el navegador; es una clave publicable |
+| `GEMINI_API_KEY` | Servidor | Necesaria para las operaciones Gemini/Veo |
+| `SUPABASE_URL` | Servidor | URL del proyecto para las funciones API |
+| `SUPABASE_PUBLISHABLE_KEY` | Servidor | Clave pública usada por el servidor al verificar sesiones de usuario |
+| `SUPABASE_SECRET_KEY` | Servidor | Operaciones privilegiadas de créditos, feedback y compras |
+| `STRIPE_SECRET_KEY` | Servidor | Opcional: crea sesiones de Stripe Checkout |
+| `STRIPE_WEBHOOK_SECRET` | Servidor | Opcional: verifica los webhooks de Stripe |
+| `MAGIS_APP_URL` | Servidor | Opcional: URL HTTPS para el retorno de Checkout |
+| `STRIPE_PRICE_<PLAN_CODE>` | Servidor | Opcional: Price ID por cada plan de pago activo, con el código del plan en mayúsculas |
+
+Las variables `SUPABASE_SECRET_KEY`, `GEMINI_API_KEY` y `STRIPE_*` son privadas y solo deben configurarse en el entorno server-side. Las funciones aún aceptan algunos nombres heredados como fallback; para nuevas configuraciones usa los nombres de esta tabla.
+
+Para habilitar la aplicación con datos reales, configura Supabase Auth y aplica las migraciones de `supabase/migrations/`. Para habilitar pagos, configura también los planes en Supabase, sus Price IDs de Stripe y el webhook que apunta a `/api/stripe-webhook`.
+
+## Arquitectura
+
+### Mapa del proyecto
+
+```text
+.
+├── index.html                    # HTML, metadatos y carga de la aplicación
+├── src/
+│   ├── main.tsx                  # Entrada React
+│   ├── App.tsx                   # Sesión, escritorio y estado de ventanas
+│   ├── components/               # Módulos y componentes de interfaz
+│   ├── domain/                   # Reglas, estados y errores del dominio
+│   │   └── algorithm/            # Algoritmo Matrix y prueba
+│   ├── feedback/                 # Contrato, política y servicio de feedback
+│   ├── hooks/                    # Hooks de operaciones asíncronas
+│   ├── services/                 # Clientes de API, Gemini, Supabase y sonido
+│   ├── styles.css                # Estilos globales y tema Tailwind
+│   └── types.ts                  # Tipos compartidos de la interfaz
+├── api/                          # Funciones serverless de Vercel
+├── lib/
+│   └── commercial.js             # Autorización, créditos y operaciones de video
+├── public/                       # Archivos estáticos
+├── supabase/
+│   ├── config.toml               # Configuración local de Supabase
+│   └── migrations/               # Esquema y cambios versionados de base de datos
+├── docs/commercial/              # Documentación de principios comerciales
+├── package.json
+├── pnpm-lock.yaml
+├── vite.config.ts
+├── tsconfig.json
+└── vercel.json
+```
+
+### Entrada y ejecución
+
+1. `index.html` carga `src/main.tsx`, que monta la aplicación React.
+2. `src/App.tsx` recupera la sesión Supabase y muestra el acceso o el escritorio MAGIS. Los módulos se cargan bajo demanda.
+3. Los componentes llaman a los servicios de `src/services/`. `apiClient.ts` adjunta el token de sesión a las solicitudes protegidas.
+4. Vercel expone cada archivo `api/*.js` como una ruta `/api/*`. Las funciones verifican identidad y estado de cuenta; las operaciones cobradas consultan créditos en el servidor antes de llamar al proveedor.
+5. La respuesta vuelve al módulo que inició la operación. Feedback se envía por separado y contiene metadatos operacionales, no prompts ni contenido generado.
+
+### Servicios del servidor
+
+| Ruta | Responsabilidad |
+| --- | --- |
+| `/api/gemini` | Texto, razonamiento, búsqueda, imagen, voz, video y análisis de video |
+| `/api/live-token` | Emite un token temporal para la sesión Live |
+| `/api/video` | Descarga el video generado tras comprobar sesión y propiedad |
+| `/api/feedback` | Persiste estado operacional y rating |
+| `/api/checkout` | Crea una sesión de Stripe Checkout |
+| `/api/stripe-webhook` | Valida el webhook y acredita compras de forma idempotente |
+
+`src/services/geminiService.ts` centraliza las llamadas de IA del navegador. `lib/commercial.js` concentra las operaciones server-side compartidas de autorización, créditos y propiedad de video.
+
+### Estilos
+
+`src/styles.css` es la hoja global. Usa Tailwind CSS 4, define los tokens visuales con `@theme` y carga Rajdhani y Share Tech Mono. Los componentes aplican las clases de Tailwind directamente; no hay un segundo framework de estilos.
+
+## Datos, créditos y seguridad
+
+- Supabase proporciona la sesión. Las funciones API verifican el token y que el perfil de usuario esté activo.
+- Las tarifas se fijan en el servidor en `lib/commercial.js`; el cliente no elige el importe.
+- Las operaciones confirmadas como fallidas pueden activar un reembolso. Si el inicio de un video fue aceptado por el proveedor pero no pudo registrarse con certeza, queda pendiente de conciliación y no se reembolsa automáticamente.
+- El estado de la operación de video se asocia al usuario. Tanto el sondeo como la descarga requieren autorización.
+- Stripe Checkout solo se considera pagado tras recibir un webhook con firma válida; el webhook acredita créditos mediante una operación idempotente.
+- Los headers de seguridad y la CSP se configuran en `vercel.json`. Si se cambia el dominio o se añaden proveedores externos, revisa la política CSP.
+
+Tarifas configuradas actualmente: texto 1 crédito, razonamiento 3, búsqueda 1, imagen 25, síntesis de voz 5, inicio de video 50, análisis de video 3 y token Live 5. El sondeo de estado de video no vuelve a cobrar. Son valores de implementación, no estimaciones del coste real del proveedor.
+
+## Build y despliegue
+
+`pnpm build` ejecuta `vite build` y produce los archivos estáticos en `dist/`. Vercel publica ese directorio y despliega los archivos de `api/` como funciones serverless. `vercel.json` configura los headers de respuesta.
+
+Antes del despliegue:
+
+1. Configura las variables de cliente y servidor en el proyecto de Vercel.
+2. Aplica las migraciones de `supabase/migrations/` y configura Auth, correo y dominios de redirección.
+3. Para pagos, configura planes y precios en Stripe y Supabase y registra `/api/stripe-webhook` como endpoint de webhook.
+4. Comprueba que la CSP en `vercel.json` permite los orígenes realmente utilizados.
+
+## Pruebas
 
 ```bash
+pnpm test
 pnpm build
-pnpm preview
 ```
 
-## Estructura
+## Notas de mantenimiento
 
-```text
-src/App.tsx
-src/main.tsx
-src/components/
-src/domain/
-src/feedback/
-src/hooks/
-src/services/
-src/core/
-api/
-styles.css
-index.html
-vercel.json
-vite.config.ts
-package.json
-```
-
-### Capa API
-
-api/checkout.js
-  └─ Stripe Checkout para packs de créditos
-
-api/stripe-webhook.js
-  └─ conciliación y acreditación idempotente de compras
-
-```text
-api/gemini.js
-  ├─ text
-  ├─ thinking
-  ├─ search
-  ├─ image
-  ├─ speech
-  ├─ videoStart
-  ├─ videoStatus
-  └─ videoAnalysis
-
-api/live-token.js
-  └─ token efímero para Live
-
-api/video.js
-  └─ proxy seguro del resultado Veo
-
-api/feedback.js
-  └─ captura autenticada de metadatos operacionales y rating
-```
-
-La migración `20261007080000_operation_feedback.sql` crea el registro de feedback y la vista diaria `operation_feedback_daily_metrics` (tasas de éxito/fallo/timeout/reintento y latencia media/p95). El acceso a la tabla y a la vista queda restringido a `service_role`; aplicar la migración antes de desplegar `/api/feedback.js`.
-
-## Principios de producto
-
-**DIAGNOSTICAR → REPARAR → OPTIMIZAR → PUBLICAR → MEDIR → MONETIZAR → ESCALAR**
-
-No introducir funcionalidades solo por aumentar el tamaño del sistema. Cada cambio debe justificar su impacto sobre seguridad, estabilidad, conversión, coste o ingresos.
-
-## Roadmap comercial
-
-### P0 — Hardening
-- Credenciales fuera del cliente.
-- Modelos vigentes.
-- Headers de seguridad.
-- Validación de inputs.
-- Limpieza de rutas y entrypoints obsoletos.
-
-### P1 — Producto vendible
-- Autenticación y débito de créditos por ejecución: base implementada; falta validar migraciones, RLS y despliegue en Supabase real.
-- Registro de uso y coste real por operación, límites distribuidos y observabilidad.
-- Eventos de conversión.
-- Checkout Stripe y conciliación idempotente de compras: implementación base.
-- Configuración de productos/precios y webhook en Stripe para activación de cobros reales.
-
-### P2 — Escala
-- Persistencia de uso y margen.
-- Observabilidad.
-- Control de abuso más robusto.
-- Router de capacidades/modelos.
-- Upsell y recompra.
-
-## SEO y adquisición
-
-MAGIS es una aplicación, no la superficie principal de SEO. La captación orgánica y publicitaria debe vivir en la web pública de Chalamandra Magistral y conducir al usuario a la oferta y después a MAGIS.
+- `dist/` es un artefacto generado; la fuente está en `src/`, `api/` y `lib/`.
+- `README.PRO.md` y `docs/commercial/MAGIS_COMMERCIAL_CORE.md` explican visión y principios de producto; no representan módulos ejecutables adicionales.
+- La documentación anterior mencionaba `src/core/` y un `styles.css` en la raíz. La estructura vigente está en el mapa de arriba.
+- El código mantiene aliases temporales para `API_KEY`, variables `VITE_SUPABASE_*` del lado servidor y `SUPABASE_SERVICE_ROLE_KEY`. Para nuevas instalaciones, usa `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` y `SUPABASE_SECRET_KEY`.
+- El límite de frecuencia actual se conserva en memoria por instancia serverless; no equivale a un límite distribuido. La conciliación de un inicio de video incierto es manual.
 
 ## Licencia
 
-MIT.
+MIT. Consulta [`LICENSE`](LICENSE).

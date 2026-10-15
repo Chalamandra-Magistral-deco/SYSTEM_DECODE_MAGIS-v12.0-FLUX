@@ -387,8 +387,11 @@ export default async function handler(req, res) {
   const body = getBody(req);
   const action = body.action;
   const payload = body.payload && typeof body.payload === "object" ? body.payload : {};
-  const expensive = ["image", "speech", "videoStart", "videoStatus", "videoAnalysis"].includes(action);
-  const allowed = rateLimit(req, expensive ? "media" : "text", expensive ? 8 : 30, 60_000);
+  const isVideoStatus = action === "videoStatus";
+  const expensive = ["image", "speech", "videoStart", "videoAnalysis"].includes(action);
+  const bucket = isVideoStatus ? "video-status" : expensive ? "media" : "text";
+  const limit = isVideoStatus ? 20 : expensive ? 8 : 30;
+  const allowed = rateLimit(req, bucket, limit, 60_000);
   if (allowed !== true) {
     return sendJson(res, 429, { error: "Rate limit exceeded. Retry shortly." }, {
       "Retry-After": String(allowed.retryAfter),
