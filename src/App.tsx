@@ -308,16 +308,22 @@ const App: React.FC = () => {
 
             </div>
 
-            {/* Dock */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex max-w-[calc(100vw-1rem)] gap-2 overflow-x-auto p-1 z-50 sm:bottom-8 sm:gap-6">
-                 <DesktopIcon label="MATRIX" icon={<Radar />} colorClass="border-neon-gold shadow-neon-gold text-neon-gold" onClick={() => toggleWindow('matrix')} />
-                 <DesktopIcon label="DEPLOY" icon={<Cpu />} colorClass="border-neon-green shadow-neon-green text-neon-green" onClick={() => toggleWindow('cicd')} />
-                 <DesktopIcon label="STUDIO" icon={<Video />} colorClass="border-neon-red shadow-neon-red text-neon-red" onClick={() => toggleWindow('media')} />
-                 <DesktopIcon label="LINK" icon={<Mic />} colorClass="border-neon-cyan shadow-neon-cyan text-neon-cyan" onClick={() => toggleWindow('live')} />
-                 <DesktopIcon label="STORE" icon={<CreditCard />} colorClass="border-neon-gold shadow-neon-gold text-neon-gold" onClick={() => toggleWindow('commerce')} />
-                 <DesktopIcon label="TERM" icon={<TerminalIcon />} colorClass="border-neon-purple shadow-neon-purple text-neon-purple" onClick={() => toggleWindow('terminal')} />
-                 <DesktopIcon label="INFO" icon={<Info />} colorClass="border-white shadow-white text-white" onClick={() => toggleWindow('about')} />
-            </div>
+            {/* Primary module navigation */}
+            <nav aria-label="Primary modules" className="absolute bottom-3 left-1/2 z-50 w-[calc(100vw-1rem)] max-w-3xl -translate-x-1/2 rounded-2xl border border-white/20 bg-black/90 p-2 shadow-2xl backdrop-blur-md sm:bottom-8 sm:p-3">
+                <div className="mb-2 flex items-center justify-between px-1 font-mono text-[0.6rem] tracking-[0.2em] text-white/60 sm:text-xs">
+                    <span>MODULE NAVIGATION</span>
+                    <span>{windows.filter((window) => window.isOpen && !window.isMinimized).length} ACTIVE</span>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-1 sm:justify-center sm:gap-4">
+                    <DesktopIcon label="MATRIX" icon={<Radar />} colorClass="border-neon-gold shadow-neon-gold text-neon-gold" isActive={windows.some((window) => window.id === 'matrix' && window.isOpen && !window.isMinimized)} onClick={() => toggleWindow('matrix')} />
+                    <DesktopIcon label="DEPLOY" icon={<Cpu />} colorClass="border-neon-green shadow-neon-green text-neon-green" isActive={windows.some((window) => window.id === 'cicd' && window.isOpen && !window.isMinimized)} onClick={() => toggleWindow('cicd')} />
+                    <DesktopIcon label="STUDIO" icon={<Video />} colorClass="border-neon-red shadow-neon-red text-neon-red" isActive={windows.some((window) => window.id === 'media' && window.isOpen && !window.isMinimized)} onClick={() => toggleWindow('media')} />
+                    <DesktopIcon label="LINK" icon={<Mic />} colorClass="border-neon-cyan shadow-neon-cyan text-neon-cyan" isActive={windows.some((window) => window.id === 'live' && window.isOpen && !window.isMinimized)} onClick={() => toggleWindow('live')} />
+                    <DesktopIcon label="STORE" icon={<CreditCard />} colorClass="border-neon-gold shadow-neon-gold text-neon-gold" isActive={windows.some((window) => window.id === 'commerce' && window.isOpen && !window.isMinimized)} onClick={() => toggleWindow('commerce')} />
+                    <DesktopIcon label="TERM" icon={<TerminalIcon />} colorClass="border-neon-purple shadow-neon-purple text-neon-purple" isActive={windows.some((window) => window.id === 'terminal' && window.isOpen && !window.isMinimized)} onClick={() => toggleWindow('terminal')} />
+                    <DesktopIcon label="INFO" icon={<Info />} colorClass="border-white shadow-white text-white" isActive={windows.some((window) => window.id === 'about' && window.isOpen && !window.isMinimized)} onClick={() => toggleWindow('about')} />
+                </div>
+            </nav>
         </div>
     );
 };
