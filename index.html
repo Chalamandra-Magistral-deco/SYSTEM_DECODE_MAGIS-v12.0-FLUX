@@ -17,5 +17,6 @@
 (function(){window.dataLayer=window.dataLayer||[];const h=window.location.hostname;const sub=h.split('.')[0]||'www';document.addEventListener('DOMContentLoaded',()=>{const n=document.getElementById('decox-nav');if(n){n.addEventListener('click',e=>{const l=e.target.closest('a');if(l){let d='external';try{const u=new URL(l.href);const p=u.hostname.split('.');d=p.length>2?p[0]:u.hostname}catch(err){}window.dataLayer.push({'event':'nav_click','source_subdomain':sub,'destination_subdomain':d,'link_url':l.href,'link_text':l.textContent.trim()})}});const c=document.getElementById('decox-cta');if(c){c.addEventListener('click',e=>{const l=e.target.closest('a');if(l){window.dataLayer.push({'event':'cta_conversion_click','source_subdomain':sub,'target_url':l.href})}})}});window.trackModuleEngagement=function(m,a,x={}){window.dataLayer.push(Object.assign({'event':'module_engagement','module_name':m,'action_type':a,'source_subdomain':sub},x))};})();
 </script>
 
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-53TVD9VW" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 </body>
 </html>
