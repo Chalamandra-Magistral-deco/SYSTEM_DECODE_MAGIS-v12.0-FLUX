@@ -314,6 +314,9 @@ const App: React.FC = () => {
                     <span>MODULE NAVIGATION</span>
                     <span>{windows.filter((window) => window.isOpen && !window.isMinimized).length} ACTIVE</span>
                 </div>
+                <p className="mb-2 px-1 font-mono text-[0.65rem] leading-tight text-white/80 sm:text-xs">
+                    Selecciona un módulo para abrirlo. Tócalo otra vez para minimizarlo; usa la X de cada ventana para cerrarlo.
+                </p>
                 <div className="flex gap-2 overflow-x-auto pb-1 sm:justify-center sm:gap-4">
                     <DesktopIcon label="MATRIX" icon={<Radar />} colorClass="border-neon-gold shadow-neon-gold text-neon-gold" isActive={windows.some((window) => window.id === 'matrix' && window.isOpen && !window.isMinimized)} onClick={() => toggleWindow('matrix')} />
                     <DesktopIcon label="DEPLOY" icon={<Cpu />} colorClass="border-neon-green shadow-neon-green text-neon-green" isActive={windows.some((window) => window.id === 'cicd' && window.isOpen && !window.isMinimized)} onClick={() => toggleWindow('cicd')} />
