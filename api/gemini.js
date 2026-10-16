@@ -1,4 +1,5 @@
 import { GoogleGenAI, Modality } from "@google/genai";
+import Groq from "groq-sdk";
 import { randomUUID } from "node:crypto";
 import {
   assertRefundConfigured,
@@ -15,6 +16,15 @@ import {
 } from "../lib/commercial.js";
 
 const apiKey = () => process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+const groqClient = () => {
+  const k = process.env.GROQ_API_KEY;
+  if (!k) {
+    const error = new Error("GROQ_API_KEY is not configured.");
+    error.statusCode = 503;
+    throw error;
+  }
+  return new Groq({ apiKey: k });
+};
 
 const buckets = globalThis.__MAGIS_RATE_LIMIT__ || new Map();
 globalThis.__MAGIS_RATE_LIMIT__ = buckets;
@@ -81,34 +91,40 @@ function requireOneOf(value, allowed, name) {
   return value;
 }
 
-async function handleText(ai, payload) {
+async function handleText(payload) {
   const prompt = requireString(payload.prompt, "Prompt");
   const systemInstruction = typeof payload.systemInstruction === "string"
     ? payload.systemInstruction.slice(0, 6000)
     : undefined;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-lite",
-    contents: prompt,
-    config: systemInstruction ? { systemInstruction } : undefined,
+  const groq = groqClient();
+  const completion = await groq.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    messages: [
+      ...(systemInstruction ? [{ role: "system", content: systemInstruction }] : []),
+      { role: "user", content: prompt },
+    ],
+    temperature: 0.7,
   });
 
-  return { text: response.text || "" };
+  return { text: completion.choices?.[0]?.message?.content || "" };
 }
 
-async function handleThinking(ai, payload) {
+async function handleThinking(payload) {
   const prompt = requireString(payload.prompt, "Prompt");
   const context = typeof payload.context === "string" ? payload.context.slice(0, 20000) : "";
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3.8-flash",
-    contents: `Context: ${context}\n\nTask: ${prompt}`,
-    config: {
-      thinkingConfig: { thinkingLevel: "high" },
-    },
+  const groq = groqClient();
+  const completion = await groq.chat.completions.create({
+    model: "deepseek-r1-distill-llama-70b",
+    messages: [
+      { role: "system", content: "Eres un arquitecto de sistemas senior. Analiza el contexto y da una respuesta técnica, concisa y en español." },
+      { role: "user", content: `Contexto: ${context}\n\nTarea: ${prompt}` },
+    ],
+    temperature: 1,
   });
 
-  return { text: response.text || "" };
+  return { text: completion.choices?.[0]?.message?.content || "" };
 }
 
 async function handleSearch(ai, payload) {
@@ -167,26 +183,30 @@ async function handleImage(payload, key) {
   return { image: `data:image/png;base64,${base64}` };
 }
 
-async function handleSpeech(ai, payload) {
+async function handleSpeech(payload) {
   const text = requireString(payload.text, "Text", 16000);
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3.8-flash-tts",
-    contents: [{ parts: [{ text }] }],
-    config: {
-      responseModalities: [Modality.AUDIO],
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName: "Kore" },
-        },
-      },
+  const response = await fetch("https://api.groq.com/openai/v1/audio/speech", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify({
+      model: "playai-tts",
+      input: text,
+      voice: "Fritz-PlayAI",
+      response_format: "wav",
+    }),
   });
 
-  const audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-  if (!audio) throw new Error("No audio generated.");
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`TTS generation failed (${response.status}): ${detail.slice(0, 300)}`);
+  }
 
-  return { audio };
+  const buffer = Buffer.from(await response.arrayBuffer());
+  return { audio: buffer.toString("base64") };
 }
 
 async function handleVideoStart(ai, payload, userId, operationId) {
@@ -359,7 +379,7 @@ async function handleVideoAnalysis(ai, payload) {
   const normalized = videoBase64.includes(",") ? videoBase64.split(",")[1] : videoBase64;
 
   const response = await ai.models.generateContent({
-    model: "gemini-3.8-flash",
+    model: "gemini-2.5-flash",
     contents: {
       parts: [
         {
@@ -421,10 +441,10 @@ export default async function handler(req, res) {
     let result;
     switch (action) {
       case "text":
-        result = await handleText(ai, payload);
+        result = await handleText(payload);
         break;
       case "thinking":
-        result = await handleThinking(ai, payload);
+        result = await handleThinking(payload);
         break;
       case "search":
         result = await handleSearch(ai, payload);
@@ -433,7 +453,7 @@ export default async function handler(req, res) {
         result = await handleImage(payload, key);
         break;
       case "speech":
-        result = await handleSpeech(ai, payload);
+        result = await handleSpeech(payload);
         break;
       case "videoStart":
         result = await handleVideoStart(ai, payload, user.id, operationId);
