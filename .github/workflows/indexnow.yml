@@ -1,0 +1,29 @@
+name: IndexNow after production deployment
+
+on:
+  deployment_status:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notify-indexnow:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'deployment_status' &&
+       github.event.deployment_status.state == 'success' &&
+       github.event.deployment.environment == 'Production')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out deployed source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.deployment.sha || github.sha }}
+
+      - name: Submit public URLs to IndexNow
+        env:
+          INDEXNOW_HOST: systemdecode.chalamandramagistral.com
+          INDEXNOW_BASE_URL: https://systemdecode.chalamandramagistral.com
+          INDEXNOW_KEY_FILE: public/ffe446a24dd9e7aad5e9d9287a6c0d90.txt
+        run: python3 scripts/submit-indexnow.py
