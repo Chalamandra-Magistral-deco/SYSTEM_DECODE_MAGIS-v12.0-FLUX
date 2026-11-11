@@ -52,16 +52,6 @@ function getBody(req) {
   return req.body;
 }
 
-function requireApiKey() {
-  const key = apiKey();
-  if (!key) {
-    const error = new Error("Server AI credentials are not configured.");
-    error.statusCode = 503;
-    throw error;
-  }
-  return key;
-}
-
 function requireString(value, name, maxLength = 12000) {
   if (typeof value !== "string" || !value.trim()) {
     const error = new Error(`${name} is required.`);
