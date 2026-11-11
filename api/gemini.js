@@ -68,6 +68,16 @@ function requireApiKey() {
   return key;
 }
 
+function requireGroqApiKey() {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) {
+    const error = new Error("GROQ_API_KEY is not configured.");
+    error.statusCode = 503;
+    throw error;
+  }
+  return key;
+}
+
 function requireString(value, name, maxLength = 12000) {
   if (typeof value !== "string" || !value.trim()) {
     const error = new Error(`${name} is required.`);
@@ -428,15 +438,17 @@ export default async function handler(req, res) {
       return sendJson(res, 400, { error: "Unknown API action." });
     }
 
+    const usesGroq = ["text", "thinking", "speech"].includes(action);
+    const key = usesGroq ? "" : requireApiKey();
+    if (usesGroq) requireGroqApiKey();
+    const ai = usesGroq ? null : new GoogleGenAI({ apiKey: key });
+
     if (action !== "videoStatus") {
       assertRefundConfigured();
       operationId = randomUUID();
       await consumeCredits(client, user.id, operationId, action, CREDIT_COSTS[action]);
       charged = true;
     }
-
-    const key = requireApiKey();
-    const ai = new GoogleGenAI({ apiKey: key });
 
     let result;
     switch (action) {
