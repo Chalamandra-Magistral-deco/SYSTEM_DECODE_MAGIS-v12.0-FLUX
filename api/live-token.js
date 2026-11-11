@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { requireProviderApiKey } from "../lib/provider-config.js";
+import { enforceRateLimit } from "../lib/rate-limit.js";
 import {
   assertRefundConfigured,
   authorizeRequest,
@@ -10,28 +11,6 @@ import {
 } from "../lib/commercial.js";
 
 
-const buckets = globalThis.__MAGIS_LIVE_RATE_LIMIT__ || new Map();
-globalThis.__MAGIS_LIVE_RATE_LIMIT__ = buckets;
-
-function limited(req) {
-  const forwarded = req.headers["x-forwarded-for"] || "";
-  const ip = String(forwarded).split(",")[0].trim() || req.socket?.remoteAddress || "unknown";
-  const now = Date.now();
-  const current = buckets.get(ip);
-
-  if (!current || now >= current.resetAt) {
-    buckets.set(ip, { count: 1, resetAt: now + 60_000 });
-    return null;
-  }
-
-  if (current.count >= 6) {
-    return Math.max(1, Math.ceil((current.resetAt - now) / 1000));
-  }
-
-  current.count += 1;
-  return null;
-}
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -40,12 +19,9 @@ export default async function handler(req, res) {
     return;
   }
 
-  const retryAfter = limited(req);
-  if (retryAfter) {
-    return sendJson(res, 429, { error: "Live token rate limit exceeded." }, {
-      "Retry-After": String(retryAfter),
-    });
-  }
+  if (!(await enforceRateLimit(req, res, {
+    scope: "live-token", limit: 6, windowSeconds: 60,
+  }))) return;
 
   let user;
   let client;
@@ -53,6 +29,9 @@ export default async function handler(req, res) {
   let charged = false;
   try {
     ({ user, client } = await authorizeRequest(req));
+    if (!(await enforceRateLimit(req, res, {
+      scope: "live-token", limit: 6, windowSeconds: 60, includeIp: false, userId: user.id,
+    }))) return;
     const key = requireProviderApiKey("gemini");
     assertRefundConfigured();
     operationId = randomUUID();

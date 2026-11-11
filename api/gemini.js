@@ -2,6 +2,7 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import Groq from "groq-sdk";
 import { randomUUID } from "node:crypto";
 import { providerForAction, requireProviderApiKey } from "../lib/provider-config.js";
+import { enforceRateLimit } from "../lib/rate-limit.js";
 import {
   assertRefundConfigured,
   authorizeRequest,
@@ -19,30 +20,6 @@ import {
 const groqClient = () => {
   return new Groq({ apiKey: requireProviderApiKey("groq") });
 };
-
-const buckets = globalThis.__MAGIS_RATE_LIMIT__ || new Map();
-globalThis.__MAGIS_RATE_LIMIT__ = buckets;
-
-function rateLimit(req, bucket, limit, windowMs) {
-  const forwarded = req.headers["x-forwarded-for"] || "";
-  const ip = String(forwarded).split(",")[0].trim() || req.socket?.remoteAddress || "unknown";
-  const key = `${bucket}:${ip}`;
-  const now = Date.now();
-  const current = buckets.get(key);
-
-  if (!current || now >= current.resetAt) {
-    buckets.set(key, { count: 1, resetAt: now + windowMs });
-    return true;
-  }
-
-  if (current.count >= limit) {
-    const retryAfter = Math.max(1, Math.ceil((current.resetAt - now) / 1000));
-    return { retryAfter };
-  }
-
-  current.count += 1;
-  return true;
-}
 
 function getBody(req) {
   if (!req.body) return {};
@@ -395,12 +372,9 @@ export default async function handler(req, res) {
   const expensive = ["image", "speech", "videoStart", "videoAnalysis"].includes(action);
   const bucket = isVideoStatus ? "video-status" : expensive ? "media" : "text";
   const limit = isVideoStatus ? 20 : expensive ? 8 : 30;
-  const allowed = rateLimit(req, bucket, limit, 60_000);
-  if (allowed !== true) {
-    return sendJson(res, 429, { error: "Rate limit exceeded. Retry shortly." }, {
-      "Retry-After": String(allowed.retryAfter),
-    });
-  }
+  if (!(await enforceRateLimit(req, res, {
+    scope: `gemini:${bucket}`, limit, windowSeconds: 60,
+  }))) return;
 
   let user;
   let client;
@@ -408,6 +382,9 @@ export default async function handler(req, res) {
   let charged = false;
   try {
     ({ user, client } = await authorizeRequest(req));
+    if (!(await enforceRateLimit(req, res, {
+      scope: `gemini:${bucket}`, limit, windowSeconds: 60, includeIp: false, userId: user.id,
+    }))) return;
     if (!Object.hasOwn(CREDIT_COSTS, action) && action !== "videoStatus") {
       return sendJson(res, 400, { error: "Unknown API action." });
     }
