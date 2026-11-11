@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { requireProviderApiKey } from "../lib/provider-config.js";
 import {
   assertRefundConfigured,
   authorizeRequest,
@@ -8,7 +9,6 @@ import {
   sendJson,
 } from "../lib/commercial.js";
 
-const apiKey = () => process.env.GEMINI_API_KEY || process.env.API_KEY || "";
 
 const buckets = globalThis.__MAGIS_LIVE_RATE_LIMIT__ || new Map();
 globalThis.__MAGIS_LIVE_RATE_LIMIT__ = buckets;
@@ -53,17 +53,11 @@ export default async function handler(req, res) {
   let charged = false;
   try {
     ({ user, client } = await authorizeRequest(req));
+    const key = requireProviderApiKey("gemini");
     assertRefundConfigured();
     operationId = randomUUID();
     await consumeCredits(client, user.id, operationId, "live", CREDIT_COSTS.live);
     charged = true;
-
-    const key = apiKey();
-    if (!key) {
-      const error = new Error("Server AI credentials are not configured.");
-      error.statusCode = 503;
-      throw error;
-    }
 
     const now = Date.now();
     const response = await fetch("https://generativelanguage.googleapis.com/v1beta/auth_tokens", {
