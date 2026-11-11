@@ -1,6 +1,7 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 import Groq from "groq-sdk";
 import { randomUUID } from "node:crypto";
+import { providerForAction, requireProviderApiKey } from "../lib/provider-config.js";
 import {
   assertRefundConfigured,
   authorizeRequest,
@@ -15,15 +16,8 @@ import {
   failVideoOperation,
 } from "../lib/commercial.js";
 
-const apiKey = () => process.env.GEMINI_API_KEY || process.env.API_KEY || "";
 const groqClient = () => {
-  const k = process.env.GROQ_API_KEY;
-  if (!k) {
-    const error = new Error("GROQ_API_KEY is not configured.");
-    error.statusCode = 503;
-    throw error;
-  }
-  return new Groq({ apiKey: k });
+  return new Groq({ apiKey: requireProviderApiKey("groq") });
 };
 
 const buckets = globalThis.__MAGIS_RATE_LIMIT__ || new Map();
@@ -62,16 +56,6 @@ function requireApiKey() {
   const key = apiKey();
   if (!key) {
     const error = new Error("Server AI credentials are not configured.");
-    error.statusCode = 503;
-    throw error;
-  }
-  return key;
-}
-
-function requireGroqApiKey() {
-  const key = process.env.GROQ_API_KEY;
-  if (!key) {
-    const error = new Error("GROQ_API_KEY is not configured.");
     error.statusCode = 503;
     throw error;
   }
@@ -438,10 +422,9 @@ export default async function handler(req, res) {
       return sendJson(res, 400, { error: "Unknown API action." });
     }
 
-    const usesGroq = ["text", "thinking", "speech"].includes(action);
-    const key = usesGroq ? "" : requireApiKey();
-    if (usesGroq) requireGroqApiKey();
-    const ai = usesGroq ? null : new GoogleGenAI({ apiKey: key });
+    const provider = providerForAction(action);
+    const key = requireProviderApiKey(provider);
+    const ai = provider === "groq" ? null : new GoogleGenAI({ apiKey: key });
 
     if (action !== "videoStatus") {
       assertRefundConfigured();
