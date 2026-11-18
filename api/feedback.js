@@ -1,3 +1,4 @@
+import { enforceRateLimit } from "../lib/rate-limit.js";
 import {
   authorizeRequest,
   createServiceClient,
@@ -70,8 +71,11 @@ export default async function handler(req, res) {
     return sendJson(res, 405, { error: "Method not allowed." });
   }
 
+  if (!(await enforceRateLimit(req, res, { scope: "feedback", limit: 30, windowSeconds: 60 }))) return;
+
   try {
     const { user } = await authorizeRequest(req);
+    if (!(await enforceRateLimit(req, res, { scope: "feedback", limit: 20, windowSeconds: 60, includeIp: false, userId: user.id }))) return;
     const event = getBody(req);
     if (!isValidEvent(event)) {
       return sendJson(res, 400, { error: "Feedback data is invalid." });

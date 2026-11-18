@@ -1,4 +1,5 @@
 import { authorizeRequest, createServiceClient, sendJson } from "../lib/commercial.js";
+import { enforceRateLimit } from "../lib/rate-limit.js";
 
 const stripeKey = () => process.env.STRIPE_SECRET_KEY || "";
 
@@ -72,8 +73,11 @@ export default async function handler(req, res) {
     return sendJson(res, 405, { error: "Method not allowed." });
   }
 
+  if (!(await enforceRateLimit(req, res, { scope: "checkout", limit: 5, windowSeconds: 60 }))) return;
+
   try {
     const { user } = await authorizeRequest(req);
+    if (!(await enforceRateLimit(req, res, { scope: "checkout", limit: 5, windowSeconds: 60, includeIp: false, userId: user.id }))) return;
     const body = getBody(req);
     const planCode = requirePlanCode(body.planCode);
 

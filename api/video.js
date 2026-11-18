@@ -1,3 +1,4 @@
+import { enforceRateLimit } from "../lib/rate-limit.js";
 import {
   authorizeRequest,
   getVideoOperation,
@@ -7,28 +8,6 @@ import {
 
 const apiKey = () => process.env.GEMINI_API_KEY || process.env.API_KEY || "";
 
-const buckets = globalThis.__MAGIS_VIDEO_STREAM_LIMIT__ || new Map();
-globalThis.__MAGIS_VIDEO_STREAM_LIMIT__ = buckets;
-
-function limited(req) {
-  const forwarded = req.headers["x-forwarded-for"] || "";
-  const ip = String(forwarded).split(",")[0].trim() || req.socket?.remoteAddress || "unknown";
-  const now = Date.now();
-  const current = buckets.get(ip);
-
-  if (!current || now >= current.resetAt) {
-    buckets.set(ip, { count: 1, resetAt: now + 60_000 });
-    return null;
-  }
-
-  if (current.count >= 20) {
-    return Math.max(1, Math.ceil((current.resetAt - now) / 1000));
-  }
-
-  current.count += 1;
-  return null;
-}
-
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
@@ -37,16 +16,16 @@ export default async function handler(req, res) {
     return;
   }
 
-  const retryAfter = limited(req);
-  if (retryAfter) {
-    return sendJson(res, 429, { error: "Rate limit exceeded." }, {
-      "Retry-After": String(retryAfter),
-    });
-  }
+  if (!(await enforceRateLimit(req, res, {
+    scope: "video-stream", limit: 20, windowSeconds: 60,
+  }))) return;
 
   let user;
   try {
     ({ user } = await authorizeRequest(req));
+    if (!(await enforceRateLimit(req, res, {
+      scope: "video-stream", limit: 20, windowSeconds: 60, includeIp: false, userId: user.id,
+    }))) return;
   } catch (error) {
     const status = Number(error?.statusCode) || 503;
     return sendJson(res, status, {
